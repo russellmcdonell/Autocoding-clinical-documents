@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+<title>README.html</title>
+
+</head>
+
+<body>
+
+<h1>Example MetaMapLite Servlet.</h1>
+
+<h2>Compiling</h2>
+
+<p>See the file build.xml in the top level directory for more information
+on the &ldquo;clean&rdquo; and &ldquo;build-war&rdquo; targets.</p>
+
+<pre><code>ant clean
+ant build-war
+</code></pre>
+
+<p>build-war compiles the source code if necessary and combines the java
+class files and the supporting data and configuration files into a web
+archive file compatible with most servlet engines (including Apache
+Tomcat and Jetty).</p>
+
+<h2>Development Directory Organization</h2>
+
+<p>Below is a pictorial representation of a possible directory
+organization for a servlet containing MetaMapLite.  The
+main properties file &ldquo;metamaplite.properties&rdquo; resides in the &ldquo;config&rdquo;
+directory.  The inverted file indexes used by MetaMapLite reside in
+the &ldquo;ivf&rdquo; directory.  The opennlp models reside in data/models
+directory.</p>
+
+<pre><code> webapp/
+     |
+     +- config
+     +- data
+     |   |
+     |   +- ivf
+     |   |   |
+     |   |   +- 2022AB    (from MetaMapLite website)
+     |   |       |
+     |   |       +- USAbase
+     |   |           |
+     |   |           +- indices
+     |   |           |   |
+     |   |           |   +- cuiconcept
+     |   |           |   +- cuisourceinfo
+     |   |           |   +- cuist
+     |   |           |
+     |   |           +- tables
+     |   +- models
+     |
+     +- lib    [metamaplite-3.6.2rc8-standalone.jar]
+     +- src
+     |   |
+     |   +- main
+     |       |
+     |       +- java
+     |       |   |
+     |       |   +- sample
+     |       |   
+     |       +- webapp
+     |           |
+     |           +- WEB-INF
+     |               |
+     |               +- WebContent
+     |               +- classes
+     |                   |
+     |                   +- sample
+     |                   
+     +- target
+         |
+         +- web
+             |
+             +- sample
+</code></pre>
+
+<p>An attempt has been made to make the directory structure somewhat
+comformant to Maven&rsquo;s recommended directory organization to allow
+relatively painless migration to Maven if desired.</p>
+
+<h2>Classes</h2>
+
+<h3>Constructor - sample.SampleWebApp.java</h3>
+
+<p>The constructor for the sample.SampleWebApp class expected the
+properties that have file paths to use paths relative to &ldquo;data&rdquo;
+directory within the servlet container directory
+(webapp/&lt;servlet-name>).  The config file is located in &ldquo;config&rdquo;
+within the servlet application directory.</p>
+
+<p>The data and config file path are stored in static variables dataPath
+and configPath which are initialized by the Servlet Context listener
+sample.SampleWebAppConfig.  The static variable rootPath is also
+initializer by the listener and refers to the root on the servlet
+container.</p>
+
+<h3>Servlet Context Listener - sample.SampleWebAppConfig.java</h3>
+
+<p>Listener for Servlet Context during servlet startup.  The listener
+sets the static variables rootPath, dataPath and configPath in the
+sample.SampleWebApp class.  The listener is referenced in
+WEB-INF/web.xml using the &ldquo;listener&rdquo; element:</p>
+
+<pre><code>&lt;listener&gt;
+  &lt;listener-class&gt;sample.SampleWebAppConfig&lt;/listener-class&gt;
+&lt;/listener&gt;
+</code></pre>
+
+<h2>Organization Of War file and Deployment directory</h2>
+
+<p>The war file generated through the &ldquo;build-war&rdquo; ant task contains the
+following directories:</p>
+
+<pre><code>Directory              Contents
+---------------------------------------------------------
+./                     index.html
+META-INF/              Manifest
+WEB-INF/               application descriptors, etc.
+WEB-INF/classes/       Java class files
+WEB-INF/lib/           third party libraries
+config/                configuration files
+data/                  special terms file
+data/ivf               inverted file indexes
+data/models            OpenNLP models
+</code></pre>
+
+<p>The tree representation of the directory organization of web archive
+(war) file and deployment directory follows:</p>
+
+<pre><code>sample-webapp/
+   |
+   +- META-INF
+   +- WEB-INF
+   |   |
+   |   +- classes
+   |   |   |
+   |   |   +- sample
+   |   |   
+   |   +- lib
+   |   
+   +- config
+   +- data
+       |
+       +- ivf
+       |   |
+       |   +- strict
+       |       |
+       |       +- indices
+       |       |   |
+       |       |   +- cuiconcept
+       |       |   +- cuisourceinfo
+       |       |   +- cuist
+       |       |   
+       |       +- tables
+       |       
+       +- models
+</code></pre>
+
+<p>See the Java Servlet Specification (http://download.oracle.com/otn-pub/jcp/servlet-3.0-fr-eval-oth-JSpec/servlet-3_0-final-spec.pdf) for more information.</p>
+
+<p>See Apache Tomcat Application Developer&rsquo;s Guide
+(https://tomcat.apache.org/tomcat-6.0-doc/appdev/deployment.html) for
+more information about deployment.</p>
+
+</body>
+</html>

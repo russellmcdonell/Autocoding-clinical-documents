@@ -1,0 +1,35 @@
+<!DOCTYPE web-app PUBLIC
+ "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN"
+ "http://java.sun.com/dtd/web-app_2_3.dtd" >
+
+<web-app>
+  <display-name>AutoCoding Application</display-name>
+  <servlet>
+    <servlet-name>MetaMap</servlet-name>
+    <servlet-class>
+      AutoCoding.MetaMap
+    </servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>MetaMap</servlet-name>
+    <url-pattern>/MetaMapLite</url-pattern>
+  </servlet-mapping>
+  <get name="errorHandler">
+    <call name="addErrorPage">
+      <arg type="int">300</arg>
+      <arg type="int">599</arg>
+      <arg type="String">/WEB-INF/ERROR/generic.jsp</arg>
+    </call>
+  </get>
+  <context-param>
+    <param-name>org.mortbay.jetty.servlet.SessionCookie</param-name>
+    <param-value>XSESSIONID</param-value>
+  </context-param>
+  <context-param>
+    <param-name>org.mortbay.jetty.servlet.SessionURL</param-name>
+    <param-value>none</param-value>
+  </context-param>
+  <listener>
+    <listener-class>AutoCoding.MetaMapConfig</listener-class>
+  </listener>
+</web-app>

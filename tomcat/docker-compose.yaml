@@ -1,0 +1,18 @@
+# Start wit the docker-compose version
+version: '3'
+# Then list and name all the volumes that you want to persist after their container is shutdown
+volumes:
+  usrlocal:
+    driver: local
+# Then list the services (containers) that need to run and the volumes they use
+services:
+  tomcat:
+    image: tomcat
+    container_name: tomcat
+    environment:
+      - TZ=Australia/Melbourne
+    ports:
+      - "8443:8443"
+      - "8080:8080"
+    volumes:
+      - usrlocal:/usr/local

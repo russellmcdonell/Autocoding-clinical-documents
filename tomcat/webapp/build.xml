@@ -1,0 +1,99 @@
+<project name="AutoCoding" default="main" basedir=".">
+
+  <!-- ==================== Initialization properties ===================== -->
+  <!-- Give user a chance to override without editing this file
+       (and without typing -D each time it compiles it) -->
+  <property file=".ant.properties" />
+  <property file="${user.home}/.ant.properties" />
+
+  <!--
+       ===================================================================
+         Set the properties related to the source tree
+       =================================================================== 
+   -->
+  <property name="java.top"        value=".."/>
+  <property name="project.top"     value="."/>
+  <property name="project.apidoc"  value="${project.top}/doc/apiDoc"/>
+  <property name="web.dir"         value="${project.top}/src/main/webapp/WEB-INF" />
+  <property name="build.dir"       value="${project.top}/target" />
+  <property name="project.classes" value="${build.dir}/web" />
+  <property name="project.src"     value="${project.top}/src/main/java"/>
+  <property name="project.lib"     value="${project.top}/lib" />
+
+  <target name="compile">
+    <mkdir dir="${project.classes}" />
+      <javac srcdir="${project.src}"
+	  destdir="${project.classes}"
+	  debug="true"	   
+	  source="18">
+      <!-- compilerarg value="-Xlint"/ -->
+      <classpath>
+        <pathelement path="${project.lib}/log4j-core-2.1.jar"/>
+        <pathelement path="${project.lib}/log4j-api-2.1.jar"/>
+        <pathelement path="${project.lib}/servlet-api.jar"/>
+        <pathelement path="${project.lib}/metamaplite-3.4-SNAPSHOT-standalone.jar"/>
+      </classpath>
+    </javac>
+  </target>
+
+    <!-- =================== javadoc generation ====================== -->
+  <target name="javadoc">
+  <!-- Add mmtx internal javadoc -->
+    <mkdir dir="${project.apidoc}" />
+    <javadoc packagenames="AutoCoding.*"
+             sourcepath="${project.src}"
+             destdir="${project.apidoc}"
+             author="true"
+             version="true"
+             use="true"
+             package="true"
+             windowtitle="AutoCoding"
+             doctitle="II Internal"
+             bottom="2006 National Library of Medicine."
+	     splitindex="true">
+      <classpath>
+	<pathelement path="${project.lib}/log4j-core-2.1.jar"/>
+	<pathelement path="${project.lib}/log4j-api-2.1.jar"/>
+	<pathelement path="${project.lib}/servlet-api.jar"/>
+	<pathelement path="${project.lib}/metamaplite-3.4-SNAPSHOT-standalone.jar"/>
+      </classpath>
+    </javadoc>
+  </target>
+
+  <target name="build-war" depends="compile">
+    <war destfile="${project.top}/target/AutoCoding.war" webxml="${web.dir}/web.xml">
+      <fileset dir = "${web.dir}/WebContent">
+	<include name = "**/*.*"/>
+      </fileset>
+      <lib dir = "${project.lib}">
+	<include name="log4j-core-2.1.jar"/>
+	<include name="log4j-api-2.1.jar"/>
+	<include name="servlet-api.jar"/>
+	<include name="metamaplite-3.4-SNAPSHOT-standalone.jar"/>
+      </lib>
+      <classes dir = "${build.dir}/web"/>
+      <zipfileset dir="config" prefix="config"/>
+      <zipfileset dir="data" prefix="data"/>
+    </war>
+  </target>
+
+  <target name="clean">
+    <delete failonerror="false">
+      <fileset dir="${project.classes}" includes="**/*.class"/>
+    </delete>
+    <delete file="${project.top}/target/AutoCoding.war"/>
+  </target>
+
+  <target name="help">
+    <echo>
+  targets: 
+    clean                clean classes and archives from working directory
+    compile              build classes 
+    build-war            build complete web archive (war) file with everything in it. 
+    javadoc              build javadoc
+    </echo>
+  </target>
+
+
+  <target name="main" depends="compile"/>
+</project>
