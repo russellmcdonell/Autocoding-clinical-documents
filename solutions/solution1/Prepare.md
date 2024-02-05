@@ -13,7 +13,7 @@ e.g. "HIGH BLOOD PRESSURE: not measured" should not be coded to 'high blood pres
 
 The layout is two colums; a 'regular expression' and a replacement 'string'.
 + Regular expressions are prepended with r'\b' if they start with an alphanumeric character and appended with r'\b' if they end with an alphanumeric character.
-Which means that the terms will only be recognised if they are preeed by, and followed by, a boundary between words and non-words.
+Which means that the terms will only be recognised if they are preceed by, and followed by, a boundary between words and non-words.
 Note: white space within the labels must be specified as \s+, brackets must be specified as \\( and \\).
 
 ## terms

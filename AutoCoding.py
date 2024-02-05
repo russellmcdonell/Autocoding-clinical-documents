@@ -109,6 +109,7 @@ if __name__ == '__main__':
         logging.shutdown()
         sys.stdout.flush()
         sys.exit(d.EX_UNAVAILABLE)
+    logging.debug('Connection to MetaMapLite server tested')
     '''
 
     # Check that the solution files all exist and appear correct.
@@ -164,6 +165,7 @@ if __name__ == '__main__':
         logging.fatal('Cannot import "data.py" for solution "%s"', d.solution)
         logging.shutdown()
         sys.exit(d.EX_CONFIG)
+    logging.debug('Solution specific data loaded')
 
     # Check the solution 'prepare' Excel workbook
     wb = load_workbook(os.path.join('solutions', d.solution, 'prepare.xlsx'))
@@ -189,9 +191,10 @@ if __name__ == '__main__':
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
 
-    # Now do any solution specific configuration and initialzation
+    # Now do any solution specific 'prepare' configuration and initialzation
     configConcepts = d.sp.configure(wb)
     d.knownConcepts.update(configConcepts)
+    logging.debug('Prepare module loaded and configured')
 
     # Check the solution 'complete' Excel workbook
     wb = load_workbook(os.path.join('solutions', d.solution, 'complete.xlsx'))
@@ -203,13 +206,17 @@ if __name__ == '__main__':
     f.loadSimpleCompileSheet(wb, 'complete', 'section markers', requiredColumns, None, None, True, True, d.sectionMarkers)
     requiredColumns = ['SolutionID', 'MetaThesaurusID(s)']
     this_df = f.checkWorksheet(wb, 'complete', 'equivalents', requiredColumns, False)
-    for index, row in this_df.iterrows():
-        equivalent = row[0]
-        d.knownConcepts.add(row[0])
+    thisData = this_df.values.tolist()
+    for record in thisData:
+        if record[0] is None:
+            break
+        # logging.debug("sheet(site implied), columns(%s), record(%s)", requiredColumns, record)
+        equivalent = record[0]
+        d.knownConcepts.add(equivalent)
         j = 1
-        while (j < len(row)) and (row[j] is not None):
-            d.equivalents[row[j]] = equivalent
-            d.knownConcepts.add(row[j])
+        while (j < len(record)) and (record[j] is not None):
+            d.equivalents[record[j]] = equivalent
+            d.knownConcepts.add(record[j])
             j += 1
     requiredColumns = ['But boundaries']
     f.loadSimpleCompileSheet(wb, 'complete', 'but boundaries', requiredColumns, None, None, True, True, d.butBoundaries)
@@ -236,6 +243,9 @@ if __name__ == '__main__':
     requiredColumns = ['SolutionID', 'Concept']
     this_df = f.checkWorksheet(wb, 'complete', 'sentence concepts', requiredColumns, True)
     for row in this_df.itertuples():
+        if row.SolutionID is None:
+            break
+        # logging.debug("sheet(sentence concepts)), columns(%s), row(%s)", requiredColumns, row)
         concept, isNeg = f.checkConfigConcept(row.SolutionID)
         reText = re.compile(f.checkPattern(row.Concept), flags=re.IGNORECASE|re.DOTALL)
         text = row.Concept
@@ -248,6 +258,9 @@ if __name__ == '__main__':
     requiredColumns = ['Start Negation', 'End Negation', 'Sentences']
     this_df = f.checkWorksheet(wb, 'complete', 'gross negations', requiredColumns, True)
     for row in this_df.itertuples():
+        if row.Start_Negation is None:
+            break
+        # logging.debug("sheet(gross negations)), columns(%s), row(%s)", requiredColumns, row)
         start = re.compile(f.checkPattern(row.Start_Negation), flags=re.IGNORECASE|re.DOTALL)
         end = re.compile(f.checkPattern(row.End_Negation), flags=re.IGNORECASE|re.DOTALL)
         sentences = int(row.Sentences)
@@ -269,3 +282,43 @@ if __name__ == '__main__':
     f.loadConceptSetsWorksheeet(wb, 'complete', 'document sequence concept sets', requiredColumns, True, d.documentConceptSequenceSets)
     f.loadConceptSetsWorksheeet(wb, 'complete', 'document concept sets', requiredColumns, True, d.documentConceptSets)
 
+    # Import the solution specific complete module and check that it has all the required functions
+    try:
+        d.sc = importlib.import_module('solutions.' + d.solution + '.complete')
+    except Exception as e:
+        logging.fatal('Cannot import "complete.py" for solution "%s"', d.solution)
+        logging.shutdown()
+        sys.exit(d.EX_CONFIG)
+    for requiredFunction in ['configure']:
+        if not hasattr(d.sc, requiredFunction):
+            logging.fatal('"complete" module in solution "%s" is missing the "%s" function', d.solution, requiredFunction)
+            logging.shutdown()
+            sys.exit(d.EX_CONFIG)
+
+    # Now do any solution specific 'complete' configuration and initialzation
+    configConcepts = d.sc.configure(wb)
+    d.knownConcepts.update(configConcepts)
+    logging.debug('Complete module loaded and configured')
+
+    # Check the solution 'analyze' Excel workbook
+    wb = load_workbook(os.path.join('solutions', d.solution, 'analyze.xlsx'))
+
+    # There are no standard solution 'analyze' Excel worksheets
+
+    # Import the solution specific analyze module and check that it has all the required functions
+    try:
+        d.sa = importlib.import_module('solutions.' + d.solution + '.analyze')
+    except Exception as e:
+        logging.fatal('Cannot import "analyze.py" for solution "%s"', d.solution)
+        logging.shutdown()
+        sys.exit(d.EX_CONFIG)
+    for requiredFunction in ['configure']:
+        if not hasattr(d.sa, requiredFunction):
+            logging.fatal('"analyzee" module in solution "%s" is missing the "%s" function', d.solution, requiredFunction)
+            logging.shutdown()
+            sys.exit(d.EX_CONFIG)
+
+    # Now do any solution specific 'analyze' configuration and initialzation
+    configConcepts = d.sa.configure(wb)
+    d.knownConcepts.update(configConcepts)
+    logging.debug('Analyze module loaded and configured')

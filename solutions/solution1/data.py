@@ -6,6 +6,7 @@ The Solution Specific common data.
 
 import re
 
+# Required for solution specific document preparation
 listMarkers = []				# The list of list markers that identify a list item
 hyphenatedWords = []			# The list of hyphenated words that should be preserved in labels/headings
 
@@ -17,4 +18,33 @@ noColon = re.compile(r':\s+$')
 addPeriod = re.compile(r'([^.])\s*$')
 allCAPS = re.compile(r'^([A-Z\s]*[A-Z])([:.\s]*)$')
 tisCLINICAL = re.compile(r'^\s*CLINICAL')
-tisINFORMATION = re.compile(r'\b' + 'INFORMATION\s*:')
+tisINFORMATION = re.compile(r'\b' + r'INFORMATION\s*:')
+
+
+# Required for solution specific coding completion
+
+
+# Required for solution specific analysis
+# Some fixed MethaThesaurus codes
+cervixUteri = 'C0007874'
+endomStructure = 'C0014180'
+normalCervixCode = 'C0567243'
+normalEndomCode = 'C0237029'
+noAbnormality = 'C0559229'
+
+SolutionMetaThesaurus = {}   # The Solution Specific MetaThesaurus codes, descriptions, source and source code
+AIHWprocedure = {}      # The dictionary of AIHW Procedure codes with matching description
+AIHWfinding = {}        # The dictionary of AIHW Finding codes with matching description
+Site = {}               # The dictionary of MetaThesaurus Site codes with matching SNOMED-CT code/description/site/subsite
+Finding = {}            # The dictionary of MetaThesaurus Finding codes with matching SNOMED-CT code/description/AIHW codes for each Site
+Procedure = {}          # The dictionary of MetaThesaurus Procedure codes with matching SNOMED-CT code/description/rank for each Site/AIHW codes for each Site
+SiteImplied = {}        # The dictionary of concepts and the concept (must be Site) that they imply
+FindingImplied = {}     # The dictionary of concepts and the concept (must be Finding) that they imply
+SiteRestrictions = {}   # The dictionary of Findings and the restricted set of Site(s) that they can be paired with
+SiteImpossible = {}     # The dictionary of Findings and the set of Site(s) that they can not be paired with
+SiteRank = {}           # The dictionary of Findings and associated dictionary of Site(s) with their associated likelyhood rank
+SiteDefault = {}        # The dictionary of Findings and associated default Sites
+DiagnosisImplied = {}   # The dictionary of concepts and two concepts (must be Site and Finding) that they imply
+ProcedureImplied = {}   # The dictionary of concepts and Procedure concepts that they imply
+ProcedureDefined = {}   # The dictionary of Procedure concepts and two concepts (must be Procedure and Site) that mean that this produre must have happened
+ReportSites = []        # The list of Report site sequence concepts

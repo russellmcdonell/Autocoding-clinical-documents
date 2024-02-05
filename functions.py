@@ -124,7 +124,7 @@ def checkWorksheet(wb, workbookName, sheet, columns, exact):
     # Make sure the required columns in the this worksheet are present
     for col in columns:
         if col not in headings:
-            logging.critical('Missing heading "%s" in sheet "%s" in worksheet "%s"', col, sheet, workbookName)
+            logging.critical('Missing heading "%s" in worksheet "%s" in workbook "%s"', col, sheet, workbookName)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
 
@@ -187,8 +187,36 @@ def loadSimpleSheet(wb, workbook, sheet, columns, target):
     for record in thisData:
         if record[0] is None:
             break
-        logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
+        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
         target.append(record)
+
+
+def loadSimpleDictionarySheet(wb, workbook, sheet, columns, target):
+    '''
+    Load a simple worksheet of keys and (list of) values into the target as a dictionary
+    '''
+    this_df = checkWorksheet(wb, workbook, sheet, columns, True)
+    thisData = this_df.values.tolist()
+    for record in thisData:
+        if record[0] is None:
+            break
+        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
+        target[record[0]] = record[1:]
+
+
+def loadSkipDictionarySheet(wb, workbook, sheet, columns, target):
+    '''
+    Load a simple worksheet of keys and (list of) values into the target as a dictionary
+    where the second column is a description of the first column and is skipped in the list of values
+    '''
+    this_df = checkWorksheet(wb, workbook, sheet, columns, True)
+    thisData = this_df.values.tolist()
+    for record in thisData:
+        if record[0] is None:
+            break
+        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
+        target[record[0]] = record[2:]
+
 
 def loadSimpleCompileSheet(wb, workbook, sheet, columns, pretext, posttext, ignorecase, dotall, target):
     '''
@@ -200,7 +228,7 @@ def loadSimpleCompileSheet(wb, workbook, sheet, columns, pretext, posttext, igno
     for record in thisData:
         if record[0] is None:
             break
-        logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
+        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
         reText = checkPattern(record[0])
         if pretext is not None:
             reText = pretext + reText
@@ -215,7 +243,6 @@ def loadSimpleCompileSheet(wb, workbook, sheet, columns, pretext, posttext, igno
             compText = re.compile(reText, flags=re.DOTALL)
         else:
             compText = re.compile(reText)
-        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
         if len(columns) == 1:
             target.append(compText)
         else:
@@ -242,7 +269,7 @@ def loadBoolComileWorksheet(wb, workbook, sheet, columns, pretext, posttext, dot
     for record in thisData:
         if record[0] is None:
             break
-        logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
+        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
         reText = checkPattern(record[0])
         if pretext is not None:
             reText = pretext + reText
@@ -280,7 +307,7 @@ def loadCompileConceptsWorksheet(wb, workbook, sheet, columns, pretext, posttext
     for record in thisData:
         if record[0] is None:
             break
-        logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
+        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
         reText = checkPattern(record[0])
         if pretext is not None:
             reText = pretext + reText
@@ -310,7 +337,7 @@ def loadCompileCompileWorksheet(wb, workbook, sheet, columns, pretext, target):
     for record in thisData:
         if record[0] is None:
             break
-        logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
+        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
         reText = checkPattern(record[0])
         if pretext is not None:
             reText = pretext + reText
@@ -335,6 +362,7 @@ def loadModifierWorksheet(wb, workbook, sheet, columns, pretext, posttext, targe
     for row in this_df.itertuples():
         if row.MetaThesaurusID is None:
             break
+        # logging.debug("sheet(%s), columns(%s), row(%s)", sheet, columns, row)
         concept, oldNeg = checkConfigConcept(row.MetaThesaurusID)
         d.knownConcepts.add(concept)
         newConcept, newNeg = checkConfigConcept(row.SolutionID)
@@ -363,7 +391,7 @@ def loadNegationListWorksheet(wb, workbook, sheet, columns, target):
     for record in thisData:
         if record[0] is None:
             break
-        logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
+        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
         solutionID = record[0]
         section = record[1]
         negate = record[2]
@@ -397,7 +425,7 @@ def loadConceptSetsWorksheeet(wb, workbook, sheet, columns, isStrict, target):
     for record in thisData:
         if record[0] is None:
             break
-        logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
+        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
         solutionID, isNegated = checkConfigConcept(record[0])
         asserted = record[1]
         if not isinstance(asserted, bool):
@@ -433,7 +461,7 @@ def loadMultiConceptSetsWorksheeet(wb, workbook, sheet, columns, isStrict, targe
     for record in thisData:
         if record[0] is None:
             break
-        logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
+        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
         solutionID, isNegated = checkConfigConcept(record[0])
         sentences = int(record[1])
         asserted = record[2]
