@@ -103,3 +103,14 @@ It should deploy successfully and start running as part of the deployment.
 
 **NOTE:** Deploying **AutoCoding.war** can take up to 30seconds, even on a fast laptop.
 
+# Testing AutoCoding.war
+The URL http://localhost:8080/AutoCoding/MetaMapLite should display a page where you can paste some free text of a clinical document.
+Clicking the "AutoCode this please" button should return a web page of original text, the original text broken up into sentences and
+the [Unified Medical Language System (UMLS)](http://www.nlm.nih.gov/research/umls/) codes.
+
+For each **UMLS** code there is an **Offset** and the **Matched Text**.
+The **Offset** of each code should line up with the **Offset** of a sentence, plus a count of leading characters in that sentence,
+up to the **Matching Text** in that sentence. However, there may be differences in how End-of-line character(s) are counted in
+two processes (splitting into sentences and finding **UMLS** codes). You may have to add the sentence number (counting from 0)
+to the sentence **Offset** in order to get alignment.
+

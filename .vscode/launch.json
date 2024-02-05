@@ -1,0 +1,28 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "AutoCode Example1",
+            "type": "python",
+            "request": "launch",
+            "program": "AutoCoding.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceFolder}/.",
+            "args": ["-I", "testData", "-O", "testOutput", "-i", "example01.txt", "-S", "solution1", "-v", "4" ]
+        },
+        {
+            "name": "Flask AutoCode Solution1",
+            "type": "python",
+            "request": "launch",
+            "program": "flask/AutoCoding.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceFolder}/.",
+            "args": ["-S", "solution1", "-v", "4" ]
+        }
+    ]
+}
