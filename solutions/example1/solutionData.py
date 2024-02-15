@@ -8,7 +8,7 @@ import re
 
 # Required for solution specific document preparation
 listMarkers = []				# The list of list markers that identify a list item
-hyphenatedWords = []			# The list of hyphenated words that should be preserved in labels/headings
+hyphenatedWords = set()			# The set of hyphenated words that should be preserved in labels/headings
 
 tisHyphen = re.compile(r'(\w+)-(\w+)', re.IGNORECASE)
 preHyphen = re.compile(r'\s+-(\w+)', re.IGNORECASE)
@@ -22,6 +22,7 @@ tisINFORMATION = re.compile(r'\b' + r'INFORMATION\s*:')
 
 
 # Required for solution specific coding completion
+solution = {}           # A dictionary of various state variables
 
 
 # Required for solution specific analysis
@@ -47,4 +48,15 @@ SiteDefault = {}        # The dictionary of Findings and associated default Site
 DiagnosisImplied = {}   # The dictionary of concepts and two concepts (must be Site and Finding) that they imply
 ProcedureImplied = {}   # The dictionary of concepts and Procedure concepts that they imply
 ProcedureDefined = {}   # The dictionary of Procedure concepts and two concepts (must be Procedure and Site) that mean that this produre must have happened
+
+# Report data
+historyProcedure = {}   # The dictionary of history procedures (key: location of procedure code in clinical document, value: concept)
+hysterectomy = set()    # The set of a hysterectomy procedures
+otherProcedure = set()  # The set of non-hysterectomy procedures
+grid = []               # The list of Diagnoses to report (Site/Finding pairs with AIHW S/E/O code)
+reportS = None          # The most important S code
+reportE = None          # The most important E code
+reportO = None          # The most important O code
+reportAIHWprocedure = {}    # The dictionary of the AIHW procedure to report
+reportSN_CTprocedure = {}   # The dictionary of the SNOMED_CT procedure to report
 ReportSites = []        # The list of Report site sequence concepts
