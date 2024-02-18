@@ -391,7 +391,7 @@ def loadCompileConceptsWorksheet(wb, workbook, sheet, columns, pretext, posttext
             d.knownConcepts.add(record[j])
             j += 1
         if len(columns) == 1:
-            target.append(compText)
+            target.append([compText])
         else:
             target.append([compText] + concepts)
 
@@ -666,7 +666,7 @@ def checkHistory(inHistory, text, depth):
         for marker, isStart in d.historyMarkers:
             if isStart:    # This is a start of history marker, but we are in history, so skip this marker
                 continue
-            logging.debug('Checking inHistory marker:%s', marker[0].pattern)
+            logging.debug('Checking inHistory marker:%s', marker.pattern)
             match = marker.search(text)
             if match is not None:        # End of history found
                 documentFound = True        # Some document 'end of history' text found
@@ -727,7 +727,7 @@ def checkHistory(inHistory, text, depth):
         for marker, isStart in d.historyMarkers:
             if not isStart:    # This is an end of history marker, but we are not in history, so skip this marker
                 continue
-            logging.debug('Checking not inHistory marker:%s', marker[0].pattern)
+            logging.debug('Checking not inHistory marker:%s', marker.pattern)
             match = marker.search(text)
             if match is not None:    # Start of history found
                 historyFound = True        # Start of history marker found
@@ -738,7 +738,7 @@ def checkHistory(inHistory, text, depth):
         if historyFound:        # We did bounce into history
             return (newStart, matchLen)
         # We aren't in history, or at least we don't think we are - the specific solution may have a different answer
-        historyAt, scChangeAt, scLen = d.sc.checkHistory(inHistory, text)
+        historyAt, scChangeAt, scLen = d.sc.solutionCheckHistory(inHistory, text)
         # The solution can indicate that history started at a previous sentence
         # All sentences between this new start of history and the current sentence are history
         if historyAt == 0:            # History starts with this sentence
@@ -863,7 +863,7 @@ def checkNegation(concept, text, start, sentenceNo, isNeg):
                     changeIt = '1'
                     reason = preNegate[0].pattern
                     prePost = 'preNegation'
-                    logging.debug('found preNegation(%s) at %d', preNegate[0].pattern, changeAt)
+                    logging.debug('found preNegation(%s) at %d', reason, changeAt)
         for immedPreNegate in d.immediatePreNegation:
             if (len(immedPreNegate) > 1) and (concept not in immedPreNegate[1:]):        # Check if this negation is limited to a list of concepts
                 continue
@@ -874,7 +874,7 @@ def checkNegation(concept, text, start, sentenceNo, isNeg):
                     changeIt = '1'
                     reason = immedPreNegate[0].pattern
                     prePost = 'immediatePreNegation'
-                    logging.debug('found immediatePreNegation (%s) at %d', immedPreNegate[0].pattern, changeAt)
+                    logging.debug('found immediatePreNegation (%s) at %d', reason, changeAt)
     for immedPreAmbig in d.immediatePreAmbiguous:
         if (len(immedPreAmbig) > 1) and (concept not in immedPreAmbig[1:]):        # Check if this ambiguity is limited to a list of concepts
             continue
@@ -883,9 +883,9 @@ def checkNegation(concept, text, start, sentenceNo, isNeg):
             if match.start() > changeAt:
                 changeAt = match.start()
                 changeIt = '2'
-                reason = immedPreAmbig.pattern
+                reason = immedPreAmbig[0].pattern
                 prePost = 'immediatePreAmbiguous'
-                logging.debug('found immediatePreAmbiguous(%s) at %d', immedPreAmbig[0].pattern, changeAt)
+                logging.debug('found immediatePreAmbiguous(%s) at %d', reason, changeAt)
     for preAmbig in d.preAmbiguous:
         if (len(preAmbig) > 1) and (concept not in preAmbig[1:]):        # Check if this ambiguity is limited to a list of concepts
             continue
@@ -894,9 +894,9 @@ def checkNegation(concept, text, start, sentenceNo, isNeg):
             if match.start() > changeAt:
                 changeAt = match.start()
                 changeIt = '2'
-                reason = preAmbig.pattern
+                reason = preAmbig[0].pattern
                 prePost = 'preAmbiguous'
-                logging.debug('found preAmbiguous(%s) at %d', preAmbig[0].pattern, changeAt)
+                logging.debug('found preAmbiguous(%s) at %d', reason, changeAt)
     if changeIt == '0':
         # No preNegate or preAmbiguous, so try postNegate and postAmbiguous
         changeAt = len(d.sentences[sentenceNo][4]) + 1
@@ -972,7 +972,7 @@ def checkModified(concept, isNeg, sentenceNo, start, miniDoc):
 
     document = d.sentences[sentenceNo][6]        # Sentences hold mini-documents
     # Check concept, oldNeg, newConcept, newNeg, pattern
-    if concept not in d.preModifiers:
+    if concept in d.preModifiers:
         thisNeg, newConcept, newNeg, modifier = d.preModifiers[concept]
         if isNeg != thisNeg:            # And matching negation (ignore ambiguity)
             if (isNeg not in [2, 3]) or (thisNeg not in [2, 3]):
@@ -983,8 +983,8 @@ def checkModified(concept, isNeg, sentenceNo, start, miniDoc):
         match = modifier.search(preText)
         if match is not None:
             logging.info('Changing concept from (%s[%s]) to (%s[%s])', concept, isNeg, newConcept, newNeg)
-            if newConcept in d.sd.SolutionMetaThesaurus:
-                document[start][miniDoc]['description'] = d.sd.SolutionMetaThesaurus[newConcept][0] + '(was:' + concept + ')'
+            if newConcept in d.solutionMetaThesaurus:
+                document[start][miniDoc]['description'] = d.solutionMetaThesaurus[newConcept]['description'] + '(was:' + concept + ')'
             else:
                 document[start][miniDoc]['description'] = 'unknown (was:' + concept + ' - ' + document[start][miniDoc]['description'] + ')'
             document[start][miniDoc]['concept'] = newConcept
@@ -1002,8 +1002,8 @@ def checkModified(concept, isNeg, sentenceNo, start, miniDoc):
         match = modifier.search(postText)
         if match is not None:
             logging.info('Changing concept from (%s[%s]) to (%s[%s])', concept, isNeg, newConcept, newNeg)
-            if newConcept in d.sd.SolutionMetaThesaurus:
-                document[start][miniDoc]['description'] = d.sd.SolutionMetaThesaurus[newConcept][0] + '(was:' + concept + ')'
+            if newConcept in d.solutionMetaThesaurus:
+                document[start][miniDoc]['description'] = d.solutionMetaThesaurus[newConcept]['description'] + '(was:' + concept + ')'
             else:
                 document[start][miniDoc]['description'] = 'unknown (was:' + concept + ' - ' + document[start][miniDoc]['description'] + ')'
             document[start][miniDoc]['concept'] = newConcept
@@ -1153,11 +1153,11 @@ def checkSets(history):
         for setNo, eachSet in enumerate(d.sentenceConceptSets):
             for thisConcept in eachSet[1]:
                 # Clear any expired instance "where" this concept have been found
-                if d.sentenceConceptFound[setNo][thisConcept]['found']:
+                if (setNo in d.sentenceConceptFound) and (thisConcept in d.sentenceConceptFound[setNo]) and d.sentenceConceptFound[setNo][thisConcept]['found']:
                     expired = sentenceNo - eachSet[1][thisConcept]['range']
                     for i in range(len(d.sentenceConceptFound[setNo][thisConcept]['where']) -1, -1, -1):    # Iterate backwards so we can use del
                         if d.sentenceConceptFound[setNo][thisConcept]['where'][i][2] <= expired:
-                            # this.logger.info('Expiring concept (%s) at sentence (%d)', str(concept), sentenceNo)
+                            logging.info('Expiring concept (%s) at sentence (%d)', str(thisConcept), sentenceNo)
                             del d.sentenceConceptFound[setNo][thisConcept]['where'][i]        # We can delete this one [n-1 is next in interation]
 
                     # If everything has been deleted then this concept has not been found
@@ -1207,6 +1207,11 @@ def checkSets(history):
                                     found = True
                             if found:
                                 logging.debug('Concept (%s) [for sentence Concept set %d] found', thisConcept, setNo)
+                                if setNo not in d.sentenceConceptFound:
+                                    d.sentenceConceptFound[setNo] = {}
+                                if thisConcept not in d.sentenceConceptFound[setNo]:
+                                    d.sentenceConceptFound[setNo][thisConcept] = {}
+                                    d.sentenceConceptFound[setNo][thisConcept]['where'] = []
                                 d.sentenceConceptFound[setNo][thisConcept]['found'] = True
                                 d.sentenceConceptFound[setNo][thisConcept]['where'].append([sentenceNo, thisStart, jj])
                             elif not d.sentenceConceptFound[setNo][thisConcept]['found']:        # an item hasn't been found
@@ -1350,7 +1355,12 @@ def checkSets(history):
                                 elif (thisIsNeg in ['2', '3']) and (thisNeg in ['2', '3']):
                                     found = True
                             if found:
-                                # this.logger.debug('Concept (%s) [for document Concept set %d] found', concept, setNo)
+                                logging.debug('Concept (%s) [for document Concept set %d] found', thisConcept, setNo)
+                                if setNo not in d.documentConceptFound:
+                                    d.documentConceptFound[setNo] = {}
+                                if setConcept not in d.documentConceptFound[setNo]:
+                                    d.documentConceptFound[setNo][setConcept] = {}
+                                    d.documentConceptFound[setNo][setConcept]['where'] = []
                                 d.documentConceptFound[setNo][setConcept]['found'] = True
                                 d.documentConceptFound[setNo][setConcept]['where'].append([sentenceNo, thisStart, jj])
                             elif not d.documentConceptFound[setNo][setConcept]['found']:        # an item hasn't been found
@@ -1462,11 +1472,11 @@ def doNegationLists():
                     for negation in d.documentNegationLists[thisConcept][thisSection]:
                         # Negate/make ambiguous every thing that matches something in this list
                         for senNo, thisSntnc in enumerate(d.sentences):            # Step through each sentence
-                            docu = thisSntnc[senNo][6]    # Sentences hold mini-documents
+                            docu = thisSntnc[6]    # Sentences hold mini-documents
                             for strt in sorted(docu, key=int):        # We step through all concepts in this sentence
                                 for k in range(len(docu[strt])):            # Step through the list of alternate concepts at this point in this sentence
-                                    thisConcept = docu[strt][k]['concept']
-                                    if thisConcept in d.documentNegationLists[thisConcept][thisSection][negation]:
+                                    thisDocConcept = docu[strt][k]['concept']
+                                    if thisDocConcept in d.documentNegationLists[thisConcept][thisSection][negation]:
                                         if negation:
                                             docu[strt][k]['negation'] = '1'
                                         else:
@@ -1513,8 +1523,8 @@ def addAdditionalConcept(concept, sentenceNo, start, j, description, negated, re
         thisConcept['used'] = False
         if description is not None:
             thisConcept['description'] = description
-        elif concept in d.SolutionMetaThesaurus:
-            thisConcept['description'] = d.SolutionMetaThesaurus[concept][0]
+        elif concept in d.solutionMetaThesaurus:
+            thisConcept['description'] = d.solutionMetaThesaurus[concept]['description']
         else:
             thisConcept['description'] = 'unknown'
         document[start].append(thisConcept)

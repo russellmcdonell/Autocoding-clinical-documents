@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "cwd": "${workspaceFolder}/.",
-            "args": ["-I", "testData", "-O", "testOutput", "-i", "example01.txt", "-S", "example1", "-v", "4" ]
+            "args": ["-I", "testData", "-O", "testOutput", "-i", "example01.txt", "-S", "example1", "-L", "logs", "-l", "example01.log", "-v", "4" ]
         },
         {
             "name": "Flask AutoCode Solution1",

@@ -79,7 +79,7 @@ def solutionCheckHistory(inHistory, text):
     '''
 
     if inHistory:        # We are in history - check to see if we came have fallen out of this history section
-        return (-1, None)
+        return (-1, None, None)
     else:                # We are not in history - check to see if that we have fallen into a new history section
         # Checking if this sentence contains 'INFORMATION:' and any of the three previous sentences starts with 'CLINICAL'
         clinicalFound = -1

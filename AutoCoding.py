@@ -318,8 +318,15 @@ def complete():
     d.sentences=[]    # The sentence/sentence part, to which we will attach mini documents of MetaThesaurus Concepts
     inHistory = False    # We assume the text document starts by referencing the present
     currentSection = 'None'
-    for sentence in d.MetaMapLiteResponse['sentences']:        # process each sentence
-        thisStart = sentence['start']        # The start of the current sentence
+    DOSeol = False          # Check for DOS/Windows end of line characters
+    lastSentence = d.MetaMapLiteResponse['sentences'][-1]
+    if (lastSentence['start'] + len(lastSentence['text']) + 1) < len(d.preparedDocument):
+        DOSeol = True
+    for sentenceNo, sentence in enumerate(d.MetaMapLiteResponse['sentences']):        # process each sentence
+        if DOSeol:
+            thisStart = sentence['start'] + sentenceNo        # The start of the current sentence is DOS/Windows land
+        else:
+            thisStart = sentence['start']        # The start of the current sentence
         thisText = sentence['text']            # The text of the current sentence
         thisText = thisText.replace('\n', ' ')            # Replace any embedded newlines with spaces
         thisText = thisText.rstrip()
@@ -454,14 +461,14 @@ def complete():
         document[thisStart][miniDoc]['used'] = False                    # This concept has not yet been used
 
         # Add a description if we have one
-        if thisConcept in d.sd.SolutionMetaThesaurus:
-            document[thisStart][miniDoc]['description'] = d.sd.SolutionMetaThesaurus[thisConcept][0]
+        if thisConcept in d.solutionMetaThesaurus:
+            document[thisStart][miniDoc]['description'] = d.solutionMetaThesaurus[thisConcept]['description']
         else:
             logging.debug(thisConcept)
             document[thisStart][miniDoc]['description'] = 'unknown'
         if thisConcept != conceptID:
-            if conceptID in d.sd.SolutionMetaThesaurus:
-                document[thisStart][miniDoc]['description'] += '(was:' + d.sd.SolutionMetaThesaurus[conceptID][0] + ')'
+            if conceptID in d.solutionMetaThesaurus:
+                document[thisStart][miniDoc]['description'] += '(was:' + d.solutionMetaThesaurus[conceptID]['description'] + ')'
             else:
                 document[thisStart][miniDoc]['description'] += '(was:unknown)'
 
@@ -524,8 +531,8 @@ def complete():
                 document[thisStart][miniDoc]['negation'] = thisIsNeg
 
                 # With a description if we have one
-                if thisConcept in d.sd.SolutionMetaThesaurus:
-                    document[start][miniDoc]['description'] = d.sd.SolutionMetaThesaurus[thisConcept][0]
+                if thisConcept in d.solutionMetaThesaurus:
+                    document[start][miniDoc]['description'] = d.solutionMetaThesaurus[thisConcept]['description']
                 else:
                     document[start][miniDoc]['description'] = commonText
 
@@ -650,7 +657,7 @@ def complete():
         document = sentence[6]    # Sentences hold mini-documents
         for thisStart in sorted(document, key=int):
             for jj, miniDoc in enumerate(document[thisStart]):
-                logging.debug('[%d:%d]%s', sentenceNo, thisStart, miniDoc[jj])
+                logging.debug('[%d:%d:%d]%s', sentenceNo, thisStart, jj, miniDoc)
 
 
     # Now add any solution specific concepts to the document
@@ -722,8 +729,11 @@ if __name__ == '__main__':
     try:
         MetaMapLiteConnection = client.HTTPConnection(d.MetaMapLiteHost, d.MetaMapLitePort)
         MetaMapLiteConnection.close()
-    except (client.NotConnected, client.InvalidURL, client.UnknownProtocol,client.UnknownTransferEncoding,client.UnimplementedFileMode,   client.IncompleteRead, client.ImproperConnectionState, client.CannotSendRequest, client.CannotSendHeader, client.ResponseNotReady, client.BadStatusLine) as e:
-        logging.critical('Cannot connect to the MetaMapLite Service on host (%s) and port (%s) [error:(%s)]', d.MetaMapLiteHost, d.MetaMapLitePort, repr(e))
+    except (client.NotConnected, client.InvalidURL, client.UnknownProtocol,client.UnknownTransferEncoding,client.UnimplementedFileMode,
+            client.IncompleteRead, client.ImproperConnectionState, client.CannotSendRequest, client.CannotSendHeader,
+            client.ResponseNotReady, client.BadStatusLine) as e:
+        logging.critical('Cannot connect to the MetaMapLite Service on host (%s) and port (%s) [error:(%s)]',
+                         d.MetaMapLiteHost, d.MetaMapLitePort, repr(e))
         logging.shutdown()
         sys.stdout.flush()
         sys.exit(d.EX_UNAVAILABLE)
@@ -734,8 +744,8 @@ if __name__ == '__main__':
         logging.critical('No solution folder named "%s"', d.solution)
         logging.shutdown()
         sys.exit(d.EX_CONFIG)
-    if not os.path.isfile(os.path.join('solutions', d.solution, 'data.py')):
-        logging.critical('No solution file "data.py" in solution folder "%s"', d.solution)
+    if not os.path.isfile(os.path.join('solutions', d.solution, 'solutionData.py')):
+        logging.critical('No solution file "solutionData.py" in solution folder "%s"', d.solution)
         logging.shutdown()
         sys.exit(d.EX_CONFIG)
     if not os.path.isfile(os.path.join('solutions', d.solution, 'prepare.py')):
@@ -767,13 +777,13 @@ if __name__ == '__main__':
         logging.shutdown()
         sys.exit(d.EX_CONFIG)
 
-    # Check the solution MetaThesaurus Excel workbook
+    # Check the solution specific MetaThesaurus Excel workbook
     wb = load_workbook(os.path.join('solutions', d.solution, 'Solution MetaThesaurus.xlsx'))
-    requiredColumns = ['MetaThesaurus code', 'MetaThesaurus description']
+    requiredColumns = ['MetaThesaurus code', 'MetaThesaurus description','Source', 'Source code']
     this_df = f.checkWorksheet(wb, 'Solution MetaThesaurus', 'Solution MetaThesaurus', requiredColumns, True)
     this_df = this_df.set_index(this_df.iloc[:,0].name)     # The code is really the index/dictionary keys()
     this_df = this_df.rename(columns={'MetaThesaurus_description': 'description'})
-    d.sd.SolutionMetaThesaurus = this_df.to_dict(orient='index')
+    d.solutionMetaThesaurus = this_df.to_dict(orient='index')
 
     # Import the solution specific data module
     try:
@@ -900,7 +910,7 @@ if __name__ == '__main__':
     f.loadConceptSetsWorksheeet(wb, 'complete', 'document concept sets', requiredColumns, True, d.documentConceptSets)
     requiredColumns = ['MetaThesaurus code']
     this_df = f.checkWorksheet(wb, 'complete', 'other concepts', requiredColumns, True)
-    d.otherConcepts = set(this_df['MetaThesaurus code'].unique())
+    d.otherConcepts = set(this_df['MetaThesaurus_code'].unique())
 
 
     # Import the solution specific complete module and check that it has all the required functions
@@ -910,7 +920,8 @@ if __name__ == '__main__':
         logging.fatal('Cannot import "complete.py" for solution "%s"', d.solution)
         logging.shutdown()
         sys.exit(d.EX_CONFIG)
-    for requiredFunction in ['configure', 'requireConcept', 'solutionCheckHistory', 'addRawConcept', 'initializeNegation', 'extendNegation', 'higherConceptFound', 'setConcept', 'solutionAddSolutionConcepts', 'addFinalConcepts', 'complete']:
+    for requiredFunction in ['configure', 'requireConcept', 'solutionCheckHistory', 'addRawConcepts', 'initalizeNegation',
+                             'extendNegation', 'higherConceptFound', 'setConcept', 'solutionAddAdditionalConcept', 'addFinalConcepts', 'complete']:
         if not hasattr(d.sc, requiredFunction):
             logging.fatal('"complete" module in solution "%s" is missing the "%s" function', d.solution, requiredFunction)
             logging.shutdown()
@@ -939,7 +950,7 @@ if __name__ == '__main__':
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
     if isFlask:
-        for requiredFunction in ['reportHTMLhead', 'reportHTMLbody', 'reportJSON']:
+        for requiredFunction in ['reportHTML', 'reportJSON']:
             if not hasattr(d.sa, requiredFunction):
                 logging.fatal('"analyzee" module in solution "%s" is missing the "%s" function', d.solution, requiredFunction)
                 logging.shutdown()
@@ -983,11 +994,11 @@ if __name__ == '__main__':
 
         # Print this clinical document
         if file == '-':
-            d.sd.resultsFile(None, None)
+            d.sa.reportFile(None, None)
             sys.exit(d.EX_OK)
         baseFile = os.path.basename(file)
         filePart, ext = os.path.splitext(baseFile)
         if d.outputDir is None:
-            d.sd.resultsFile(d.inputDir, 'AutoCoded_' + filePart)
+            d.sa.reportFile(d.inputDir, 'AutoCoded_' + filePart)
         else:
-            d.sd.resultsFile(d.outputDir, filePart)
+            d.sa.reportFile(d.outputDir, filePart)

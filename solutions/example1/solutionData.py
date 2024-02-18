@@ -33,7 +33,6 @@ normalCervixCode = 'C0567243'
 normalEndomCode = 'C0237029'
 noAbnormality = 'C0559229'
 
-SolutionMetaThesaurus = {}   # The Solution Specific MetaThesaurus codes, descriptions, source and source code
 AIHWprocedure = {}      # The dictionary of AIHW Procedure codes with matching description
 AIHWfinding = {}        # The dictionary of AIHW Finding codes with matching description
 Site = {}               # The dictionary of MetaThesaurus Site codes with matching SNOMED-CT code/description/site/subsite

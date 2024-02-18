@@ -1,4 +1,6 @@
-# pylint: disable=line-too-long, broad-exception-caught, invalid-name, too-many-lines
+# pylint: disable=line-too-long, broad-exception-caught, invalid-name, too-many-lines, too-many-nested-blocks
+# pylint: disable=too-many-locals, too-many-branches, too-many-statements
+
 '''
 This is the histopathology autocoding analysis module
 '''
@@ -6,7 +8,6 @@ This is the histopathology autocoding analysis module
 import sys
 import os
 import logging
-from collections import OrderedDict
 import functions as f
 import data as d
 
@@ -42,32 +43,31 @@ def configure(wb):
             sys.exit(d.EX_CONFIG)
 
         # Check that this Site is a defined SNOMED_CT code
-        if concept not in d.sd.SolutionMetaThesaurus:
+        if concept not in d.solutionMetaThesaurus:
             logging.critical('Site(%s) in worksheet(Site) in workbook(analyze) not in the SolutionMetaThesaurus workbook', concept)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        if d.sd.SolutionMetaThesaurus[concept][1] != "SNOMEDCT_US":
+        if d.solutionMetaThesaurus[concept]['Source'] != "SNOMEDCT_US":
             logging.critical('Site(%s) in worksheet(Site) in workbook(analyze) is not SNOMED_CT', concept)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
         d.sd.Site[concept] = {}
         configConcepts.add(concept)
-        d.sd.Site[concept]['snomed_ct'] = d.sd.SolutionMetaThesaurus[concept][2]
-        d.sd.Site[concept]['desc'] = d.sd.SolutionMetaThesaurus[concept][0]
+        d.sd.Site[concept]['snomed_ct'] = d.solutionMetaThesaurus[concept]['Source_code']
+        d.sd.Site[concept]['desc'] = d.solutionMetaThesaurus[concept]['description']
 
         # Next validate site and subsite
-        site = row.Site
-        if site not in ['cervix', 'vagina', 'other', 'notStated']:
-            logging.critical('Site(%s) in worksheet(Site) in workbook(analyze) not in "cervix", "vagina", "other" or "notStated"', site)
+        if row.Site not in ['cervix', 'vagina', 'other', 'notStated']:
+            logging.critical('Site(%s) in worksheet(Site) in workbook(analyze) not in "cervix", "vagina", "other" or "notStated"', row.Site)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Site[concept]['site'] = site
-        subsite = row.SubSite
-        if subsite not in ['cervix', 'vagina', 'endom', 'other', 'notStated']:
-            logging.critical('SubSite(%s) in worksheet(Site) in workbook(analyze) not in "cervix", "vagina", "endom", "other" or "notStated"', subsite)
+        d.sd.Site[concept]['site'] = row.Site
+        if row.SubSite not in ['cervix', 'vagina', 'endom', 'other', 'notStated']:
+            logging.critical('SubSite(%s) in worksheet(Site) in workbook(analyze) not in "cervix", "vagina", "endom", "other" or "notStated"',
+                             row.SubSite)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Site[concept]['subsite'] = subsite
+        d.sd.Site[concept]['subsite'] = row.SubSite
 
     # Now check that we have configurations for a few, fixed MetaThesaurus Site codes
     if d.sd.cervixUteri not in d.sd.Site:
@@ -93,46 +93,42 @@ def configure(wb):
             sys.exit(d.EX_CONFIG)
 
         # Check that this Finding is a defined SNOMED_CT code
-        if concept not in d.sd.SolutionMetaThesaurus:
+        if concept not in d.solutionMetaThesaurus:
             logging.critical('Finding in worksheet(Site) in workbook(analyze) not in the SolutionMetaThesaurus workbook')
             logging.shutdown()
             sys.stdout.flush()
             sys.exit(d.EX_CONFIG)
-        if d.sd.SolutionMetaThesaurus[concept][1] != "SNOMEDCT_US":
+        if d.solutionMetaThesaurus[concept]['Source'] != "SNOMEDCT_US":
             logging.critical('Finding(%s) in worksheet(Site) in workbook(analyze) is not SNOMED_CT', concept)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
         d.sd.Finding[concept] = {}
         configConcepts.add(concept)
-        d.sd.Finding[concept]['snomed_ct'] = d.sd.SolutionMetaThesaurus[concept][2]
-        d.sd.Finding[concept]['desc'] = d.sd.SolutionMetaThesaurus[concept][0]
+        d.sd.Finding[concept]['snomed_ct'] = d.solutionMetaThesaurus[concept]['Source_code']
+        d.sd.Finding[concept]['desc'] = d.solutionMetaThesaurus[concept]['description']
 
         # Next validate Cervix, Vagina, Other and Not Stated
         # We have to map MetaThesaurus codes to AIHW S/E/O codes, based upon 'site'
-        cervix = row.Cervix
-        if cervix not in d.sd.AIHWfinding:
-            logging.critical('Cervix code(%s) in worksheet(Finding) in workbook(analyze) is not a valid AIHW Finding code', cervix)
+        if row.Cervix not in d.sd.AIHWfinding:
+            logging.critical('Cervix code(%s) in worksheet(Finding) in workbook(analyze) is not a valid AIHW Finding code', row.Cervix)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Finding[concept]['cervix'] = cervix
-        vagina = row.Vagina
-        if vagina not in d.sd.AIHWfinding:
-            logging.critical('Vagina code(%s) in worksheet(Finding) in workbook(analyze) is not a valid AIHW Finding code', vagina)
+        d.sd.Finding[concept]['cervix'] = row.Cervix
+        if row.Vagina not in d.sd.AIHWfinding:
+            logging.critical('Vagina code(%s) in worksheet(Finding) in workbook(analyze) is not a valid AIHW Finding code', row.Vagina)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Finding[concept]['vagina'] = vagina
-        other = row.Other
-        if other not in d.sd.AIHWfinding:
-            logging.critical('Other code(%s) in worksheet(Finding) in workbook(analyze) is not a valid AIHW Finding code', other)
+        d.sd.Finding[concept]['vagina'] = row.Vagina
+        if row.Other not in d.sd.AIHWfinding:
+            logging.critical('Other code(%s) in worksheet(Finding) in workbook(analyze) is not a valid AIHW Finding code', row.Other)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Finding[concept]['other'] = other
-        notStated = row.Not_Stated
-        if notStated not in d.sd.AIHWfinding:
-            logging.critical('Not Stated code(%s) in worksheet(Finding) in workbook(analyze) is not a valid AIHW Finding code', notStated)
+        d.sd.Finding[concept]['other'] = row.Other
+        if row.Not_Stated not in d.sd.AIHWfinding:
+            logging.critical('Not Stated code(%s) in worksheet(Finding) in workbook(analyze) is not a valid AIHW Finding code', row.Not_Stated)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Finding[concept]['notStated'] = notStated
+        d.sd.Finding[concept]['notStated'] = row.Not_Stated
 
     # Now check that we have configurations for a few, fixed MetaThesaurus Finding codes
     if d.sd.normalCervixCode not in d.sd.Finding:
@@ -162,56 +158,48 @@ def configure(wb):
             sys.exit(d.EX_CONFIG)
 
         # Check that this Procedure is a defined SNOMED_CT code
-        if concept not in d.sd.SolutionMetaThesaurus:
+        if concept not in d.solutionMetaThesaurus:
             logging.critical('Procedure(%s) in worksheet(Site) in workbook(analyze) not in sheet SolutionMetaThesaurus', concept)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        if d.sd.SolutionMetaThesaurus[concept][1] != "SNOMEDCT_US":
+        if d.solutionMetaThesaurus[concept]['Source'] != "SNOMEDCT_US":
             logging.critical('Procedure(%s) in worksheet(Site) in workbook(analyze) is not SNOMED_CT', concept)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
         d.sd.Procedure[concept] = {}
         configConcepts.add(concept)
-        d.sd.Procedure[concept]['snomed_ct'] = d.sd.SolutionMetaThesaurus[concept][2]
-        d.sd.Procedure[concept]['desc'] = d.sd.SolutionMetaThesaurus[concept][0]
+        d.sd.Procedure[concept]['snomed_ct'] = d.solutionMetaThesaurus[concept]['Source_code']
+        d.sd.Procedure[concept]['desc'] = d.solutionMetaThesaurus[concept]['description']
 
         # Next validate Cervix, Vagina, Other, Not Stated, Cervix Rank, Vagina Rank, Other Rank, Not Stated Rank
         # We have to map SNOMED_CT procedure codes to AIHW procedure codes,
         # but then only report the one most significant procedure (highest rank)
         d.sd.Procedure[concept]['site'] = {}
-        cervix = row.Cervix
-        d.sd.Procedure[concept]['site']['cervix'] = cervix
-        if (cervix not in d.sd.AIHWprocedure) and (cervix != '99'):
-            logging.critical('Cervix code(%s) in worksheet(Procedure) in workbook(analyze) is not a valid AIHW Procedure code', cervix)
+        d.sd.Procedure[concept]['site']['cervix'] = row.Cervix
+        if (row.Cervix not in d.sd.AIHWprocedure) and (row.Cervix != '99'):
+            logging.critical('Cervix code(%s) in worksheet(Procedure) in workbook(analyze) is not a valid AIHW Procedure code', row.Cervix)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        vagina = row.Vagina
-        if (vagina not in d.sd.AIHWprocedure) and (vagina != '99'):
-            logging.critical('Vagina code(%s) in worksheet(Procedure) in workbook(analyze) is not a valid AIHW Procedure code', vagina)
+        if (row.Vagina not in d.sd.AIHWprocedure) and (row.Vagina != '99'):
+            logging.critical('Vagina code(%s) in worksheet(Procedure) in workbook(analyze) is not a valid AIHW Procedure code', row.Vagina)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Procedure[concept]['site']['vagina'] = vagina
-        other = row.Other
-        if (other not in d.sd.AIHWprocedure) and (other != '99'):
-            logging.critical('Other code(%s) in worksheet(Procedure) in workbook(analyze) is not a valid AIHW Procedure code', other)
+        d.sd.Procedure[concept]['site']['vagina'] = row.Vagina
+        if (row.Other not in d.sd.AIHWprocedure) and (row.Other != '99'):
+            logging.critical('Other code(%s) in worksheet(Procedure) in workbook(analyze) is not a valid AIHW Procedure code', row.Other)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Procedure[concept]['site']['other'] = other
-        notStated = row.Not_Stated
-        if (notStated not in d.sd.AIHWprocedure) and (notStated != '99'):
-            logging.critical('Not Stated code(%s) in worksheet(Procedure) in workbook(anallyze) is not a valid AIHW Procedure code', notStated)
+        d.sd.Procedure[concept]['site']['other'] = row.Other
+        if (row.Not_Stated not in d.sd.AIHWprocedure) and (row.Not_Stated != '99'):
+            logging.critical('Not Stated code(%s) in worksheet(Procedure) in workbook(anallyze) is not a valid AIHW Procedure code', row.Not_Stated)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Procedure[concept]['site']['notStated'] = notStated
+        d.sd.Procedure[concept]['site']['notStated'] = row.Not_Stated
         d.sd.Procedure[concept]['rank'] = {}
-        cervixRank = row.Cervix_Rank
-        d.sd.Procedure[concept]['rank']['cervix'] = cervixRank
-        vaginaRank = row.Vagina_Rank
-        d.sd.Procedure[concept]['rank']['vagina'] = vaginaRank
-        otherRank = row.Other_Rank
-        d.sd.Procedure[concept]['rank']['other'] = otherRank
-        notStatedRank = row.Not_Stated_Rank
-        d.sd.Procedure[concept]['rank']['notStated'] = notStatedRank
+        d.sd.Procedure[concept]['rank']['cervix'] = row.Cervix_Rank
+        d.sd.Procedure[concept]['rank']['vagina'] = row.Vagina_Rank
+        d.sd.Procedure[concept]['rank']['other'] = row.Other_Rank
+        d.sd.Procedure[concept]['rank']['notStated'] = row.Not_Stated_Rank
 
     # THE FOLLOWING ARE 'complete' DATA STRUCTURES - data structures required by the 'complete' module,
     # but the validity of the 'complete' configuration data depends upon 'analysis' data.
@@ -591,7 +579,8 @@ def analyze():
     Analyze the sentences and concepts and build up the results which are stored in the this.solution dictionary
     '''
 
-    # Find all the sentence Sites and Finding, plus track Procedures
+    # Find all the sentence Sites and Finding, plus track Procedures.
+    # This is preparitory work that is needed by the juxtoposition analysis below.
     d.sd.historyProcedure = {}
     d.sd.hysterectomy = set()
     d.sd.otherProcedure = set()
@@ -602,8 +591,8 @@ def analyze():
     SentenceFindings = {}                # The Findings found in each sentence
     for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence looking for implied Sites preceed any SentenceSites
         sentence = d.sentences[sentenceNo]
-        SentenceSites[sentenceNo] = OrderedDict()
-        SentenceFindings[sentenceNo] = OrderedDict()
+        SentenceSites[sentenceNo] = {}
+        SentenceFindings[sentenceNo] = {}
         document = sentence[6]    # Sentences hold mini-documents
         for start in sorted(document, key=int):        # We step through all concepts in this sentence
             for j in range(len(document[start])):            # Step through the list of alternate concepts at this point in this sentence
@@ -643,7 +632,7 @@ def analyze():
                         SentenceFindings[sentenceNo][start] = []
                     SentenceFindings[sentenceNo][start].append((concept, isHistory))        # The Sentence Finding(s)
 
-                    # Check if this is an unsatifactory Finding
+                    # Check if this concept is an unsatifactory Finding
                     if d.sd.Finding[concept]['cervix'] == 'SU':
                         d.sd.solution['unsatFinding'] = concept
                     continue
@@ -657,6 +646,7 @@ def analyze():
                     SentenceSites[sentenceNo][start].append((concept, isHistory, False))        # The Sentence Site - not used
 
                     # Mark cervixFound or endomFound if appropriate
+                    # By "found" we mean that these site were noted
                     subsite = d.sd.Site[concept]['subsite']
                     if subsite == 'cervix':
                         if not d.sd.solution['cervixFound']:
@@ -671,7 +661,10 @@ def analyze():
         # end of all the concepts in this sentence
     # end of sentence
 
-    # Now look through each sentence for Site/Finding pairs
+    # Juxtopositiona Analysis
+    # Start by looking through each sentence for Site/Finding pairs, in the same history phase, and add them to the grid.
+    # [Only non-history things are actually added to the grid, but the gridAppend() function does procedure analysis as well
+    #  for implied procedures, which can be historical.]
     d.sd.grid = []
     d.sd.solution['cervixDone'] = False
     d.sd.solution['endomDone'] = False
@@ -691,33 +684,30 @@ def analyze():
         # We subtract the 'distance' from the 'likelyhood' in order to score each Site for this Finding.
         # Highest score wins.
 
-        # Walk through the findings one at a time
-        for FSindex in range(len(SentenceFindings[sentenceNo]) - 1, -1, -1):
-            FindingStart = list(SentenceFindings[sentenceNo])[FSindex]
+        # Build up the Site index so we can compute 'nearest' Site to a Finding and number of other Sites in beteween
+        SiteAt = {}
+        for SiteIndex, SiteStart in enumerate(sorted(SentenceSites[sentenceNo])):
+            SiteAt[SiteStart] = SiteIndex
 
-            # Find the nearest Site
-            best = None
-            bestIndex = None
-            SSindex = -1
-            for SiteStart in SentenceSites[sentenceNo]:
-                SSindex += 1
-                if (best is None) or abs(FindingStart - SiteStart) < best:
-                    best = abs(FindingStart - SiteStart)
-                    bestIndex = SSindex
-
-            # Then wak though all the Findings at this start - looking for the best Site
-            for FSsubIndex in range(len(SentenceFindings[sentenceNo][FindingStart]) - 1, -1, -1):
-                thisFinding, thisFindingHistory = SentenceFindings[sentenceNo][FindingStart][FSsubIndex]
-
+        # Work through the findings in this sentence
+        for FindingStart in SentenceFindings[sentenceNo]:
+            # Find the nearest Site for all the Findings at this FindingStart
+            nearestStart = None
+            smallestDif = None
+            for SiteStart in SiteAt:
+                if (smallestDif is None) or abs(FindingStart - SiteStart) < smallestDif:
+                    smallestDif = abs(FindingStart - SiteStart)
+                    nearestStart = SiteStart
+            # Now work through all the Findings at this FindingStart - looking for the best Site
+            for thisFindingIndex, (thisFinding, thisFindingHistory) in enumerate(SentenceFindings[sentenceNo][FindingStart]):
                 # Now test every site
-                bestSiteStart = None
-                bestSiteSubIndex = None
                 bestRank = None
-                SSindex = -1
+                bestSiteStart = None
+                bestSiteIndex = None
+                bestSite = None
+                bestSiteHistory = None
                 for SiteStart in SentenceSites[sentenceNo]:
-                    SSindex += 1
-                    for SSsubIndex in range(len(SentenceSites[sentenceNo][SiteStart])):
-                        thisSite, thisSiteHistory, thisSiteUsed = SentenceSites[sentenceNo][SiteStart][SSsubIndex]
+                    for thisSiteIndex, (thisSite, thisSiteHistory, thisSiteUsed) in enumerate(SentenceSites[sentenceNo][SiteStart]):
                         # If they are from different histories then they are not a match
                         if thisFindingHistory != thisSiteHistory:
                             continue
@@ -734,25 +724,26 @@ def analyze():
                             rank = d.sd.SiteRank[thisFinding][thisSite]
                         else:
                             rank = 4
-                        rank -= abs(SSindex - bestIndex)
+                        rank -= abs(SiteAt[nearestStart] - SiteAt[SiteStart])
                         if (bestRank is None) or (rank < bestRank):
                             bestRank = rank
                             bestSiteStart = SiteStart
-                            bestSiteSubIndex = SSsubIndex
+                            bestSiteIndex = thisSiteIndex
+                            bestSite = thisSite
+                            bestSiteHistory = thisSiteHistory
 
                 # If we found a Site add it to the grid, mark the Site as used and delete this Finding from SentenceFindings
                 if bestRank is not None:
-                    thisSite, thisSiteHistory, thisSiteUsed = SentenceSites[sentenceNo][bestSiteStart][bestSiteSubIndex]
-                    siteCode = d.sd.Site[thisSite]['site']
-                    subSiteCode = d.sd.Site[thisSite]['subsite']
+                    siteCode = d.sd.Site[bestSite]['site']
+                    subSiteCode = d.sd.Site[bestSite]['subsite']
                     findingCode = d.sd.Finding[thisFinding][siteCode]
-                    gridAppend(sentenceNo, FindingStart, thisSite, thisSiteHistory, thisFinding, findingCode, subSiteCode)
+                    gridAppend(sentenceNo, FindingStart, bestSite, bestSiteHistory, thisFinding, findingCode, subSiteCode)
                     # Delete this finding and move onto the next one
-                    del SentenceFindings[sentenceNo][FindingStart][FSsubIndex]
+                    del SentenceFindings[sentenceNo][FindingStart][thisFindingIndex]
                     if len(SentenceFindings[sentenceNo][FindingStart]) == 0:
                         del SentenceFindings[sentenceNo][FindingStart]
                     # Mark the site as used
-                    SentenceSites[sentenceNo][bestSiteStart][bestSiteSubIndex] = (thisSite, thisSiteHistory, True)
+                    SentenceSites[sentenceNo][bestSiteStart][bestSiteIndex] = (bestSite, bestSiteHistory, True)
         # end of this sentence
     # end of sentences
 
@@ -770,38 +761,36 @@ def analyze():
             maxGap = 4        # in which case they are valid for 4
         # Find the Sites across these sentences
         localSites = []
+        bestSiteIndex = None
         for sno in range(max(0, sentenceNo - maxGap), min(sentenceNo + maxGap, len(d.sentences))):
-            if sno == sentenceNo:        # No sites in this sentence matched
-                localSites.append((sno, 0))        # Add a marker for the "sentence containing this Finding"
-                findingIndex = len(localSites)
+            if sno == sentenceNo:        # No Sites in the current sentence - that was handled above
+                localSites.append((sno, 0))     # A fake marker being "this sentence"
+                bestSiteIndex = len(localSites)     # The index of "this sentence"
                 continue
-            if len(SentenceSites[sno]) == 0:
+            if len(SentenceSites[sno]) == 0:        # No Sites in this sentence
                 continue
-            for SiteStart in SentenceSites[sno]:
+            for SiteStart in sorted(SentenceSites[sno]):        # Add all the sites in this sentence
                 localSites.append((sno, SiteStart))
-        # If there are no sites around this sentence - go to the next sentence
-        if len(localSites) == 1:        # Just the "this sentence" marker
+        # If there are no Sites around this sentence, just the fake marker for "this sentence" - go to the next sentence
+        if len(localSites) == 1:
             break
 
         # Walk through the findings in this sentence
-        for FSindex in range(len(SentenceFindings[sentenceNo]) - 1, -1, -1):
-            FindingStart = list(SentenceFindings[sentenceNo])[FSindex]
+        for FindingStart in SentenceFindings[sentenceNo]:
             # Then wak though all the Findings at this start - looking for the best Site
-            for FSsubIndex in range(len(SentenceFindings[sentenceNo][FindingStart]) - 1, -1, -1):
-                thisFinding, thisFindingHistory = SentenceFindings[sentenceNo][FindingStart][FSsubIndex]
+            for thisFindingIndex, (thisFinding, thisFindingHistory) in enumerate(SentenceFindings[sentenceNo][FindingStart]):
 
-                # Find the best site from the local sites
+                # Find the best site from the local sites - which is an orderd list
+                bestRank = None
                 bestSno = None
                 bestSiteStart = None
-                bestSiteSubIndex = None
-                bestRank = None
-                SSindex = -1
-                for SSindex, siteInfo in enumerate(localSites):
-                    sno, SiteStart = siteInfo
-                    if sno == sentenceNo:    # The "sentence containing this Finding" marker
+                bestSiteIndex = None
+                bestSite = None
+                bestSiteHistory = None
+                for localIndex, (sno, SiteStart) in enumerate(localSites):
+                    if sno == sentenceNo:       # Skip fake marker for "this sentence"
                         continue
-                    for SSsubIndex in range(len(SentenceSites[sno][SiteStart])):
-                        thisSite, thisSiteHistory, thisSiteUsed = SentenceSites[sno][SiteStart][SSsubIndex]
+                    for thisSiteIndex, (thisSite, thisSiteHistory, thisSiteUsed) in SentenceSites[sno][SiteStart]:
                         # If they are from different histories then they are not a match
                         if thisFindingHistory != thisSiteHistory:
                             continue
@@ -818,40 +807,39 @@ def analyze():
                             rank = d.sd.SiteRank[thisFinding][thisSite]
                         else:
                             rank = 4
-                        rank -= abs(SSindex - findingIndex)
+                        rank -= abs(bestSiteIndex - localIndex)
                         if (bestRank is None) or (rank < bestRank):
                             bestRank = rank
                             bestSno = sno
                             bestSiteStart = SiteStart
-                            bestSiteSubIndex = SSsubIndex
+                            bestSiteIndex = thisSiteIndex
+                            bestSite = thisSite
+                            bestSiteHistory = thisSiteHistory
                 # If we found a Site add it to the grid, mark the Site as used and delete this Finding from SentenceFindings
                 if bestRank is not None:
-                    thisSite, thisSiteHistory, thisSiteUsed = SentenceSites[bestSno][bestSiteStart][bestSiteSubIndex]
-                    siteCode = d.sd.Site[thisSite]['site']
-                    subSiteCode = d.sd.Site[thisSite]['subsite']
+                    siteCode = d.sd.Site[bestSite]['site']
+                    subSiteCode = d.sd.Site[bestSite]['subsite']
                     findingCode = d.sd.Finding[thisFinding][siteCode]
-                    gridAppend(sentenceNo, FindingStart, thisSite, thisSiteHistory, thisFinding, findingCode, subSiteCode)
+                    gridAppend(sentenceNo, FindingStart, bestSite, bestSiteHistory, thisFinding, findingCode, subSiteCode)
                     # Delete this finding and move onto the next one
-                    del SentenceFindings[sentenceNo][FindingStart][FSsubIndex]
+                    del SentenceFindings[sentenceNo][FindingStart][thisFindingIndex]
                     if len(SentenceFindings[sentenceNo][FindingStart]) == 0:
                         del SentenceFindings[sentenceNo][FindingStart]
                     # Mark the site as used
-                    SentenceSites[bestSno][bestSiteStart][bestSiteSubIndex] = (thisSite, thisSiteHistory, True)
+                    SentenceSites[bestSno][bestSiteStart][bestSiteIndex] = (thisSite, thisSiteHistory, True)
 
     # Report unused Sites
-    for sentenceNo, sites in SentenceSites.items():
-        for SiteStart in sites:
-            for SSsubIndex in range(len(SentenceSites[sentenceNo][SiteStart])):
-                thisSite, thisSiteHistory, thisSiteUsed = SentenceSites[sentenceNo][SiteStart][SSsubIndex]
+    for sentenceNo, Sites in SentenceSites.items():
+        for SiteStart in Sites:
+            for thisSite, thisSiteHistory, thisSiteUsed in SentenceSites[sentenceNo][SiteStart]:
                 if thisSiteUsed:
                     continue
                 logging.info('Unused Site in sentence(%s):%s - %s', sentenceNo, thisSite, d.sd.Site[thisSite]['desc'])
 
     # Report unused Findings
-    for sentenceNo, findings in SentenceFindings.items():
-        for FindingStart in findings:
-            for FSsubIndex in range(len(SentenceFindings[sentenceNo][FindingStart])):
-                thisFinding, thisFindingHistory = SentenceFindings[sentenceNo][FindingStart][FSsubIndex]
+    for sentenceNo, Findings in SentenceFindings.items():
+        for FindingStart in Findings:
+            for thisFinding, thisFindingHistory in SentenceFindings[sentenceNo][FindingStart]:
                 if thisFinding in d.sd.SiteDefault:    # Check if we have a default site
                     thisSite = d.sd.SiteDefault
                     siteCode = d.sd.Site[thisSite]['site']

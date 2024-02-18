@@ -40,7 +40,7 @@ MetaMapLiteResponse = None  # The data returned by the MetaMapLite Service
 FlaskPort = None            # The port for the AutoCoding service on this server
 solution = None             # The name of the solution for AutoCoding clinical documents
 cleanPython = re.compile(r'\W+|^(?=\d)')  # Convert column names to valid Pandas variables
-SolutionMetaThesaurus = {}  # The MetaThesaurus codes used in this solution
+solutionMetaThesaurus = {}  # The Solution Specific MetaThesaurus codes, descriptions, source and source code
 knownConcepts = set()       # The set of concepts known to be relevant to AutoCoding (from the configuration values)
 otherConcepts = set()       # The set of concepts found in clinical documents of this type, but known to be irrelevant to this solution
 sd = None                   # The Solution data model
