@@ -292,7 +292,7 @@ def loadSimpleCompileSheet(wb, workbook, sheet, columns, pretext, posttext, igno
     return
 
 
-def loadBoolComileWorksheet(wb, workbook, sheet, columns, pretext, posttext, dotall, target):
+def loadBoolCompileWorksheet(wb, workbook, sheet, columns, pretext, posttext, dotall, target):
     '''
     Load a worksheet which has isCase and/or isStart into the target as a list of tuples
     where the first value in each tuple is a compiled regular expression
@@ -323,7 +323,7 @@ def loadBoolComileWorksheet(wb, workbook, sheet, columns, pretext, posttext, dot
     for record in thisData:
         if record[0] is None:
             break
-        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
+        logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
         reText = checkPattern(record[0])
         if pretext is not None:
             reText = pretext + reText
@@ -340,13 +340,13 @@ def loadBoolComileWorksheet(wb, workbook, sheet, columns, pretext, posttext, dot
                 sys.exit(d.EX_CONFIG)
         if record[isCase]:
             if dotall is not None:
-                compText = re.compile(reText, flags=re.IGNORECASE|re.DOTALL)
+                compText = re.compile(reText, flags=re.DOTALL)
             else:
-                compText = re.compile(reText, flags=re.IGNORECASE)
+                compText = re.compile(reText)
         elif dotall is not None:
-            compText = re.compile(reText, flags=re.DOTALL)
+            compText = re.compile(reText, flags=re.IGNORECASE|re.DOTALL)
         else:
-            compText = re.compile(reText)
+            compText = re.compile(reText, flags=re.IGNORECASE)
         if len(columns) == 1:
             target.append(compText)
         elif isCase < (len(columns) - 1):
@@ -508,18 +508,20 @@ def loadNegationListWorksheet(wb, workbook, sheet, columns, target):
     return
 
 
-def loadConceptSetsWorksheeet(wb, workbook, sheet, columns, isStrict, target):
+def loadSequenceConceptSetsWorksheet(wb, workbook, sheet, columns, isStrict, target):
     '''
     Load a worksheet into the target as a list of tuples
     where the first tuple element is a Solution ID.
     The second tuple element is a list of tuples, being pairs of MetaThesaurusIDs and a ternary value indicating
-    whether the MetaThesaurusI is asserted, negated or ambiguous.
+    whether the MetaThesaurusID is asserted, negated or ambiguous.
     This is the set of concepts being searched for in the clincial document.
-    The third tuple element is a boolean indicating whether this is a strict sequence set.
+    The third tuple element is a boolean indicating these concepts occur in a strict sequence (no intervening concepts).
     The fourth tuple element is the maximum number of sentence within which this sequence must occur.
     The fifth tuple element is a ternary value indicating whether the Solution ID is asserted, negated or ambiguous.
-    The sixth tuple element indicates that the matched MetaThesaurusIDs should be deemed 'Used'
-    so that they cannot participate in any further set matching operations.
+    The sixth tuple element indicates wherter or not all the matched MetaThesaurusIDs should be deemed 'Used'
+    when the set if found and the Solution ID added to the document. That is, concepts found to match the set
+    are deemed 'Used' and cannot participate in any further set or matching operations.
+    e.g. (SolutionID, [(concept, isNeg)], isStrict, sentences, isNeg, asserted)
     Parameters
         wb              - an openpyxl workbook containing configuration data
         workbookName    - str, the name of the workbook/part of the solution
@@ -572,6 +574,74 @@ def loadConceptSetsWorksheeet(wb, workbook, sheet, columns, isStrict, target):
             target.append((solutionID, concepts, isStrict, sentences, isNegated, asserted))
         else:
             target.append((solutionID, concepts, isStrict, 1, isNegated, asserted))
+    return
+
+
+def loadConceptSetsWorksheet(wb, workbook, sheet, columns, target):
+    '''
+    Load a worksheet into the target as a list of tuples
+    where the first tuple element is a Solution ID.
+    The second tuple element is a list of tuples, being pairs of MetaThesaurusIDs and a ternary value indicating
+    whether the MetaThesaurusID is asserted, negated or ambiguous.
+    This is the set of concepts being searched for in the clincial document.
+    The third tuple element is the maximum number of sentence within which this sequence must occur.
+    The fourth tuple element is a ternary value indicating whether the Solution ID is asserted, negated or ambiguous.
+    The fifth tuple element indicates wherter or not all the matched MetaThesaurusIDs should be deemed 'Used'
+    when the set if found and the Solution ID added to the document. That is, concepts found to match the set
+    are deemed 'Used' and cannot participate in any further set or matching operations.
+    e.g. (SolutionID, [(concept, isNeg)], sentences, isNeg, asserted)
+    Parameters
+        wb              - an openpyxl workbook containing configuration data
+        workbookName    - str, the name of the workbook/part of the solution
+        sheet           - str, the name of the sheet to be loaded
+        columns         - list(str), the list of columns required/to be loaded
+        isStrict        - boolean, True means concepts must be sequential (loaded as part of the data)
+        target          - data structure where the data is to be loaded
+    Returns
+        Nothing
+    '''
+
+    # Check for multi-sentence worksheet - must be column[1]
+    try:
+        colAt = columns.index('Sentences')
+        if colAt == 1:
+            isMulti = True
+        else:
+            isMulti = False
+    except ValueError:
+        isMulti = False
+
+    this_df = checkWorksheet(wb, workbook, sheet, columns, False)
+    thisData = this_df.values.tolist()
+    for record in thisData:
+        if record[0] is None:
+            break
+        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
+        solutionID, isNegated = checkConfigConcept(record[0])
+        if isMulti:
+            sentences = int(record[1])
+            asserted = record[2]
+        else:
+            asserted = record[1]
+        if not isinstance(asserted, bool):
+            logging.critical('Invalid value for Asserted (%s) in worksheet(%s) in workbook(%s) in solution folder "%s"', asserted, sheet, workbook, d.solution)
+            logging.shutdown()
+            sys.exit(d.EX_CONFIG)
+        d.knownConcepts.add(solutionID)
+        concepts = []
+        if isMulti:
+            j = 3
+        else:
+            j = 2
+        while (j < len(record)) and (record[j] is not None):
+            conceptID, thisNeg = checkConfigConcept(record[j])
+            concepts.append((conceptID, thisNeg))
+            d.knownConcepts.add(conceptID)
+            j += 1
+        if isMulti:
+            target.append((solutionID, concepts, sentences, isNegated, asserted))
+        else:
+            target.append((solutionID, concepts, 1, isNegated, asserted))
     return
 
 
@@ -655,37 +725,41 @@ def checkHistory(inHistory, text, depth):
         matchLen    - int, the length of the matching text which triggered a  history change
     '''
 
-    logging.debug('Checking for history in text(%s)', text)
+    logging.debug('checkHistory() - checking for history in text(%s)', text)
     # Check if we are in history and ran into something useful, or in useful text, but ran in to history
     if inHistory:        # We are in history - check to see if we've come to the end of this history section
+        logging.debug('checkHistory() - checking for leaving history in text(%s)', text)
         # Check for the configured end of history markers (regular expression, ignore case)
-        documentFound = False
+        historyEndFound = False
         newStart = None
         matchLen = None
         # Search for the first occurence of an 'end of history marker' in this text
         for marker, isStart in d.historyMarkers:
             if isStart:    # This is a start of history marker, but we are in history, so skip this marker
                 continue
-            logging.debug('Checking inHistory marker:%s', marker.pattern)
+            logging.debug('checkHistory() - checking endOfHistory marker:%s[%s]', marker.pattern, marker.flags)
             match = marker.search(text)
             if match is not None:        # End of history found
-                documentFound = True        # Some document 'end of history' text found
+                historyEndFound = True        # Some document 'end of history' text found
                 # Remember where we ended history
                 if (newStart is None) or (match.start() < newStart):
                     newStart = match.start()
                     matchLen = len(match.group())
-        if documentFound:        # We did bounced out of history
+        if historyEndFound:        # We did bounced out of history
+            logging.debug('checkHistory() - end of history found at %d with "%s"', newStart, text[newStart:newStart + matchLen])
             return (newStart, matchLen)
         # We are still in history, or at least we think we are - the specific solution may have a different answer
         historyEnds, scChangeAt, scLen = d.sc.solutionCheckHistory(inHistory, text)
         # The solution can indicate that history ended at a previous sentence
         # All sentences between this new end of history and the current sentence are not history
         if historyEnds == 0:        # History ends with this sentence
+            logging.debug('checkHistory() - solution say history ended at the start of this sentence')
             return (scChangeAt, scLen)
         elif historyEnds > 0:        # History ended with a previous sentence
             # History ended several sentences ago - update those sentences to not history
             # We need to reprocess these sentence as they were processed as though they were in history.
             # However this is recursive, so check that we haven't fallen into a recursive loop
+            logging.debug('checkHistory() - solution says history ended %d sentences ago', historyEnds)
             if depth > 2:
                 logging.critical('Too many levels of recursion when checking history')
                 logging.shutdown()
@@ -719,6 +793,7 @@ def checkHistory(inHistory, text, depth):
         else:
             return (None, None)
     else:        # We are not in history - check that we didn't fall into another history section
+        logging.debug('Checking for entering history in text(%s)', text)
         # Check for the configured start of history markers (regular expression, ignore case)
         historyFound = False
         newStart = None
@@ -727,7 +802,7 @@ def checkHistory(inHistory, text, depth):
         for marker, isStart in d.historyMarkers:
             if not isStart:    # This is an end of history marker, but we are not in history, so skip this marker
                 continue
-            logging.debug('Checking not inHistory marker:%s', marker.pattern)
+            logging.debug('Checking inHistory marker:%s[%s]', marker.pattern, marker.flags)
             match = marker.search(text)
             if match is not None:    # Start of history found
                 historyFound = True        # Start of history marker found
@@ -736,12 +811,14 @@ def checkHistory(inHistory, text, depth):
                     newStart = match.start()
                     matchLen = len(match.group())
         if historyFound:        # We did bounce into history
+            logging.debug('checkHistory() - history found at %d with text "%s"', newStart, text[newStart:newStart + matchLen])
             return (newStart, matchLen)
         # We aren't in history, or at least we don't think we are - the specific solution may have a different answer
         historyAt, scChangeAt, scLen = d.sc.solutionCheckHistory(inHistory, text)
         # The solution can indicate that history started at a previous sentence
         # All sentences between this new start of history and the current sentence are history
         if historyAt == 0:            # History starts with this sentence
+            logging.debug('checkHistory() - solution say history started at the start of this sentence')
             return (scChangeAt, scLen)
         elif historyAt > 0:            # History starts at a previous sentence
             # History started several sentences ago - update those sentences to history
@@ -751,6 +828,7 @@ def checkHistory(inHistory, text, depth):
                 logging.critical('Too many levels of recursion when checking history')
                 logging.shutdown()
                 sys.exit(d.EX_CONFIG)
+            logging.debug('checkHistory() - solution says history started %d sentences ago', historyEnds)
             thisHistory = True
             for fixIt in range(0, historyAt):
                 d.sentences[-1 - fixIt][0] = False        # Has no history changes
@@ -789,6 +867,7 @@ def checkHistory(inHistory, text, depth):
                         startHistory = match.start()
                         matchLen = len(match.group())
             if startHistory is not None:
+                logging.debug('checkHistory() - found a pre-history tag at %d', startHistory)
                 return (startHistory, matchLen)
         return (None, None)
 
@@ -1021,8 +1100,8 @@ def checkSets(history):
         Nothing
     '''
 
-    # Check if any of the sentences contains any of the the Sentence Concept Sequence Sets
-    # We test sentence sequence sets first because they are a stricter test
+    # Check if any of the sentences contains any of the the Sentence (Strict) Sequence Concept Sets
+    # We test sentence sequence sets first because they are a stricter test.
     # Sentence sequence sets are checked in the order in which they are appended to the sentenceConceptSequenceSets array
     # which is 'sent_strict_seq_concepts_set', 'sentence_sequence_concept_sets', 'multi_sent_strict_seq_conc_sets' then 'multi_sentence_seq_concept_sets'
     # [solutionID, [[concept, negation]], isStrict, sentenceRange, isNeg, asserted]
@@ -1030,53 +1109,53 @@ def checkSets(history):
     # check each sentence concept sequence set
     for setNo, (higherConcept, thisSet, isStrict, sentenceRange, higherConceptNegated, asserted) in enumerate(d.sentenceConceptSequenceSets):
         logging.debug('Checking sentence Concept Sequence set (%s) [%s]', d.sentenceConceptSequenceSets[setNo], history)
-        conceptNo = 0        # The index of the next concept in the set
-        conceptList = []    # The concepts in this list that have been found
+        if len(thisSet) == 0:       # Empty concept list
+            continue
+        conceptNo = 0           # The index of the next concept in the sequence set
+        conceptList = []        # The concepts in this set that have been found
+        concept, isNeg = thisSet[conceptNo]     # The next concept that we are looking for
+        firstConcept, firstIsNeg = thisSet[0]
         for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
-            logging.debug('checkSets - sentence Concept Sequence Sets - processing sentence[%d]', sentenceNo)
-            sentenceStart = sentence[2]        # The character position start of this sentence
+            logging.debug('checkSets - sentence Concept (Strict) (Sequence) Sets - processing sentence[%d]', sentenceNo)
             document = sentence[6]        # Sentences hold mini-documents
-            if conceptNo == 0:        # Compute a new 'valid range' if still looking for the first concept
+            if len(conceptList) == 0:        # Compute a new 'valid range' if still looking for the first concept
                 # Compute the last sentence for this range
                 lastSentence = sentenceNo + sentenceRange - 1
                 if lastSentence >= len(d.sentences):
                     lastSentence = len(d.sentences) - 1
                 # Compute the character position of the end of the last sentence in this range
                 sentenceEnd = d.sentences[lastSentence][2] + d.sentences[lastSentence][3]
-
             for thisStart in sorted(document, key=int):        # We step through all concepts in each sentence
-                conceptFound = False                    # Concept in theSet at 'conceptNo' not yet found
-                for jj in range(len(document[thisStart])):    # Step through the list of alternate concepts at this point in this sentence
+                conceptFound = False                    # Concept in theSet at 'conceptNo' not yet found at thisStart
+                for jj, miniDoc in enumerate(document[thisStart]):    # Step through the list of alternate concepts at this point in this sentence
                     # Only check history if we are looking for history, and non-history if we are looking for non-history
-                    if document[thisStart][jj]['history'] != history:
+                    if miniDoc['history'] != history:
                         break
-
-                    if document[thisStart][jj]['used']:        # Skip used concepts
+                    if miniDoc['used']:        # Skip used concepts
                         continue
-
                     # Ignore any concept who's text extends beyond this sentence range
-                    if thisStart + document[thisStart][jj]['length'] > sentenceEnd:
+                    if thisStart + miniDoc['length'] > sentenceEnd:
                         continue
-
-                    thisConcept = document[thisStart][jj]['concept']        # This concept
-                    thisIsNeg = document[thisStart][jj]['negation']        # And it's negation
-
+                    thisConcept = miniDoc['concept']        # This concept
+                    thisIsNeg = miniDoc['negation']        # And it's negation
                     # Only check concepts that we know something about - the appeared in one of our configuration files
                     if thisConcept not in d.knownConcepts:
                         continue
-
-                    # Check if this alternate concept at 'start' is the next one in this sentence concept sequence set
+                    # Check if this alternate concept, at 'start', is in the next concept in this sentence concept sequence set
                     found = False
-                    thisNeg =  thisSet[conceptNo][1]        # The desired negation
-                    if thisConcept == thisSet[conceptNo][0]:    # A matching concept
-                        if thisNeg == thisIsNeg:
-                            found = True        # With a mathing negation
-                        elif (thisIsNeg in ['2', '3']) and (thisNeg in ['2', '3']):
-                            found = True        # Or a near enough negation (both ambiguous)
-                    if not found:    # Check the special case of a repetition of the first concept in the set
+                    if concept == thisConcept:
+                        if isNeg == thisIsNeg:
+                            found = True
+                            break
+                        elif (isNeg in ['2', '3']) and (thisIsNeg in ['2', '3']):
+                            found = True
+                            break
+                    if not found:
+                        # Check for a restart of the sequence,
+                        # We special case of a repetition of the first concept in the set
                         # We don't handle repetitions within a set - just a repetition of the first concept
                         # i.e.looking for concept 'n' - found concept 0 [this set, array of concepts in dict, first entry, concept]
-                        if thisConcept == thisSet[0][0]:
+                        if (thisConcept == firstConcept) and ((firstIsNeg == thisIsNeg) or (firstIsNeg in ['2', '3']) and (thisIsNeg in ['2', '3'])):
                             # Found the first concept - restart the multi-sentence counter
                             # Compute the last sentence for this range
                             lastSentence = sentenceNo + sentenceRange - 1
@@ -1084,25 +1163,28 @@ def checkSets(history):
                                 lastSentence = len(d.sentences) - 1
                             # Compute the character position of the end of the last sentence in this range
                             sentenceEnd = d.sentences[lastSentence][2] + d.sentences[lastSentence][3]
-                            logging.debug('concept(%s[%s]) is not the next concept (%s[%s]) in set[%d]',
-                                            thisConcept, thisIsNeg, thisSet[conceptNo][0], thisNeg, setNo)
+                            conceptList = []
+                            conceptList.append((sentenceNo, thisStart, jj))        # Add to the list of things we may need to mark as 'used'
+                            conceptNo = 1
+                            conceptFound = True
+                            logging.debug('concept(%s[%s]) is not the next concept (%s[%s]) in set[%d], but is the first - restarting',
+                                            thisConcept, thisIsNeg, concept, isNeg, setNo)
+                            break   # Proceed to next 'start' in this sentence
                         continue
-                    logging.debug('Concept (%s) [for sentence Concept Sequence set %d] found', thisConcept, setNo)
-                    conceptList.append([sentenceNo, thisStart, jj])        # Add to the list of things we may need to mark as 'used'
+                    # We have the next concept from this set
                     conceptFound = True
+                    conceptList.append((sentenceNo, thisStart, jj))        # Add to the list of things we may need to mark as 'used'
+                    logging.debug('Concept (%s) [for sentence Concept (Strict) (Sequence) set:%d] found', thisConcept, setNo)
                     conceptNo += 1
-                    if conceptNo == len(thisSet):
-                        # We have a full concept sequence set - so save the higher concept - append the higher concept to the list of alternates
+                    if len(conceptList) == len(thisSet):
+                        # We have a full concept (strict) (sequence) set - so save the higher concept - append the higher concept to the list of alternates
                         logging.info('Sentence concept sequence set (%s:%s) found', higherConcept, thisSet)
                         addAdditionalConcept(higherConcept, sentenceNo, thisStart, jj, None, higherConceptNegated,
-                                             f'sentenceConceptSequenceSet:{repr(thisSet)}', 0)
+                                            f'sentenceConceptSequenceSet:{repr(thisSet)}', 0)
 
                         # Check if we should mark all/some of the concepts in the concept list as used
-                        if (asserted) or (d.sc.higherConceptFound(higherConcept)):
-                            for item in conceptList:
-                                sno = item[0]
-                                strt = item[1]
-                                k = item[2]
+                        if asserted or (d.sc.higherConceptFound(higherConcept)):
+                            for sno, strt, k in conceptList:
                                 foundConcept = d.sentences[sno][6][strt][k]['concept']
                                 # Check if we should mark this concepts in the concept list as used
                                 if asserted or (d.sc.setConcept(higherConcept, foundConcept)):
@@ -1111,21 +1193,21 @@ def checkSets(history):
 
                         conceptNo = 0        # Restart in case the same concept sequence set exists later in the sentences
                         conceptList = []
-                        conceptFound = False
                         # Compute the last sentence for this range
                         lastSentence = sentenceNo + sentenceRange - 1
                         if lastSentence >= len(d.sentences):
                             lastSentence = len(d.sentences) - 1
                         # Compute the character position of the end of the last sentence in this range
                         sentenceEnd = d.sentences[lastSentence][2] + d.sentences[lastSentence][3]
-                    # end of list of things to check
+                        break   # Proceed to next 'start' in this sentence
+                    else:
+                        conceptNo += 1
                 # end of all the alternate concepts at this point in the sentence
                 # If this is a strict list - and we are part way through matching the concepts, then start again
                 if isStrict and (conceptNo > 0) and not conceptFound:    # Tried all alternatives and the next concept in the strict list was not found
                     logging.info('Strict sequence started[%d] abandoned due to mismatch', setNo)
                     conceptNo = 0        # Restart in case the set exists later in the sentences
                     conceptList = []
-                    conceptFound = False
                     # Compute the last sentence for this range
                     lastSentence = sentenceNo + sentenceRange - 1
                     if lastSentence >= len(d.sentences):
@@ -1135,108 +1217,94 @@ def checkSets(history):
             # If we are part way through matching the concepts, but this is the last sentence in the current range then start again
             if (conceptNo > 0) and (sentenceNo == lastSentence):
                 conceptNo = 0
-        # end of the sentence
+                conceptList = []
+        # end of the sentences
     # end of sentence concept sequence set
 
 
-    # Next check if any of the sentences contains any of the the Sentence Concept Sets
+    # Next check the Sentence Concept Sets
     # We test these next because Sentence Concept Sets may create concepts that become part of a document sequence or document concept set
     # Sentence Concept Sets can be valid over a number of sentences, but we may have to expire things found if we go beyond that range
-    for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
-        logging.info('checkSets Sentence Concept Sets - processing sentence[%d]', sentenceNo)
-        sentenceStart = sentence[2]
-        sentenceLength = sentence[3]
-        document = sentence[6]        # Sentences hold mini-documents
+    # (SolutionID, [(concept, isNeg)], sentences, isNeg, asserted)
+    for setNo, (higherConcept, thisSet, sentenceRange, higherConceptNegated, asserted) in enumerate(d.sentenceConceptSets):
+        logging.debug('Checking sentence Concept set (%s) [%s]', d.sentenceConceptSets[setNo], history)
+        if len(thisSet) == 0:       # Empty concept list
+            continue
+        toFindCount = {}        # The count of the number of times each concept/negation occurs in this set
+        for concept, isNeg in thisSet:
+            if (concept, isNeg) not in toFindCount:
+                toFindCount[(concept, isNeg)] = 1
+            else:
+                toFindCount[(concept, isNeg)] += 1
+        conceptList = []        # The concepts in this set that have been found
+        for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
+            logging.debug('checkSets - sentence Concept Sets - processing sentence[%d]', sentenceNo)
+            document = sentence[6]        # Sentences hold mini-documents
+            if len(conceptList) == 0:        # Compute a new 'valid range' if still looking for the first concept
+                # Compute the last sentence for this range
+                lastSentence = sentenceNo + sentenceRange - 1
+                if lastSentence >= len(d.sentences):
+                    lastSentence = len(d.sentences) - 1
+                # Compute the character position of the end of the last sentence in this range
+                sentenceEnd = d.sentences[lastSentence][2] + d.sentences[lastSentence][3]
 
-        # Clear the sentence concept sets at the start of every sentence
-        sentenceConceptSetFound = {}        # The higher concepts found in this sentence - so we don't add them more than once
-        for setNo, eachSet in enumerate(d.sentenceConceptSets):
-            for thisConcept in eachSet[1]:
-                # Clear any expired instance "where" this concept have been found
-                if (setNo in d.sentenceConceptFound) and (thisConcept in d.sentenceConceptFound[setNo]) and d.sentenceConceptFound[setNo][thisConcept]['found']:
-                    expired = sentenceNo - eachSet[1][thisConcept]['range']
-                    for i in range(len(d.sentenceConceptFound[setNo][thisConcept]['where']) -1, -1, -1):    # Iterate backwards so we can use del
-                        if d.sentenceConceptFound[setNo][thisConcept]['where'][i][2] <= expired:
-                            logging.info('Expiring concept (%s) at sentence (%d)', str(thisConcept), sentenceNo)
-                            del d.sentenceConceptFound[setNo][thisConcept]['where'][i]        # We can delete this one [n-1 is next in interation]
+            for thisStart in sorted(document, key=int):        # We step through all concepts in each sentence
+                for jj, miniDoc in enumerate(document[thisStart]):    # Step through the list of alternate concepts at this point in this sentence
+                    # Only check history if we are looking for history, and non-history if we are looking for non-history
+                    if miniDoc['history'] != history:
+                        break
+                    if miniDoc['used']:        # Skip used concepts
+                        continue
+                    # Ignore any concept who's text extends beyond this sentence range
+                    if thisStart + miniDoc['length'] > sentenceEnd:
+                        continue
+                    thisConcept = miniDoc['concept']        # This concept
+                    thisIsNeg = miniDoc['negation']        # And it's negation
+                    # Only check concepts that we know something about - the appeared in one of our configuration files
+                    if thisConcept not in d.knownConcepts:
+                        continue
+                    # Check if this alternate concept, at 'start', is in this sentence concept set
+                    if (thisConcept, thisIsNeg) not in toFindCount:
+                        continue
+                    if toFindCount[(thisConcept, thisIsNeg)] == 0:      # All required instances already found
+                        continue
+                    toFindCount[(thisConcept, thisIsNeg)] -= 1
+                    conceptList.append((sentenceNo, thisStart, jj))        # Add to the list of things we may need to mark as 'used'
+                    logging.debug('Concept (%s) [for sentence Concept set:%d] found', thisConcept, setNo)
+                    if len(conceptList) == len(thisSet):
+                        # We have a full concept set - so save the higher concept - append the higher concept to the list of alternates
+                        logging.info('Sentence concept set (%s:%s) found', higherConcept, thisSet)
+                        addAdditionalConcept(higherConcept, sentenceNo, thisStart, jj, None, higherConceptNegated,
+                                            f'sentenceConceptSequenceSet:{repr(thisSet)}', 0)
 
-                    # If everything has been deleted then this concept has not been found
-                    if len(d.sentenceConceptFound[setNo][thisConcept]['where']) == 0:
-                        logging.debug('Concept (%s) no longer found', thisConcept)
-                        d.sentenceConceptFound[setNo][thisConcept]['found'] = False
+                        # Check if we should mark all/some of the concepts in the concept list as used
+                        if (asserted) or (d.sc.higherConceptFound(higherConcept)):
+                            for sno, strt, k in conceptList:
+                                foundConcept = d.sentences[sno][6][strt][k]['concept']
+                                # Check if we should mark this concepts in the concept list as used
+                                if asserted or (d.sc.setConcept(higherConcept, foundConcept)):
+                                    d.sentences[sno][6][strt][k]['used'] = True
+                                    logging.debug('Marking sentence concept sequence set item at %d/%d as used', strt, k)
 
-        # Now look for concepts in this sentence that are in a sentence concept set
-        # We step through all concepts in this sentence
-        for thisStart in sorted(document, key=int):
-            for jj in range(len(document[thisStart])):            # Step through the list of alternate concepts at this point in this sentence
-                # Only check history if we are looking for history, and non-history if we are looking for non-history
-                if document[thisStart][jj]['history'] != history:
-                    break
-
-                thisConcept = document[thisStart][jj]['concept']
-                thisIsNeg = document[thisStart][jj]['negation']        # Check negation matches
-
-                if document[thisStart][jj]['used']:        # Skip used concepts
-                    continue
-
-                if thisStart + document[thisStart][jj]['length'] > sentenceStart + sentenceLength:     # Skip concepts that extend beyond the end of this sentence
-                    break
-
-                # Only check concepts that we know something about - the appeared in one of our configuration files
-                if thisConcept not in d.knownConcepts:
-                    continue
-
-                # Look for sentence concept sets - 'found' and 'where' are reset for every sentence
-                if thisConcept in d.inSentenceConceptSets:                # this concept is in at least one sentence concept set
-                    for setNo in d.inSentenceConceptSets[thisConcept]:            # check each sentence concept set that contains this concept
-                        logging.debug('Checking if (%s:%s) is in sentence concept set %s', thisConcept, thisIsNeg, d.sentenceConceptSets[setNo])
-                        higherConcept = d.sentenceConceptSets[setNo][0]
-                        higherConceptNegated = d.sentenceConceptSets[setNo][2]
-                        higherConceptAsserted = d.sentenceConceptSets[setNo][3]
-                        if higherConcept in sentenceConceptSetFound:    # the higher concept  has already been been found
-                            logging.debug('higherConcept(%s) for this set(%d) in sentence(%s) has already been found', higherConcept, setNo, sentenceNo)
-                            continue
-                        fullSet = True
-                        for setConcept in d.sentenceConceptSets[setNo][1]:    # check each concept in the set
-                            found = False
-                            if setConcept == thisConcept:            # required item, so check if it has been found
-                                thisNeg = d.sentenceConceptSets[setNo][1][thisConcept]['isNeg']
-                                if thisIsNeg == thisNeg:
-                                    found = True
-                                elif (thisIsNeg in ['2', '3']) and (thisNeg in ['2', '3']):
-                                    found = True
-                            if found:
-                                logging.debug('Concept (%s) [for sentence Concept set %d] found', thisConcept, setNo)
-                                if setNo not in d.sentenceConceptFound:
-                                    d.sentenceConceptFound[setNo] = {}
-                                if thisConcept not in d.sentenceConceptFound[setNo]:
-                                    d.sentenceConceptFound[setNo][thisConcept] = {}
-                                    d.sentenceConceptFound[setNo][thisConcept]['where'] = []
-                                d.sentenceConceptFound[setNo][thisConcept]['found'] = True
-                                d.sentenceConceptFound[setNo][thisConcept]['where'].append([sentenceNo, thisStart, jj])
-                            elif not d.sentenceConceptFound[setNo][thisConcept]['found']:        # an item hasn't been found
-                                fullSet = False                    # at least one item remains missing
-                        if fullSet:            # the concept set is full - append the higher concept to the list of alternates
-                            logging.info('Sentence concept set (%s:%s) found', higherConcept, d.sentenceConceptFound[setNo])
-                            sentenceConceptSetFound[higherConcept] = True        # full concept set found so mark the higher concept as found and save it
-                            addAdditionalConcept(higherConcept, sentenceNo, thisStart, jj, None, higherConceptNegated,
-                                                 f'sentenceConceptSet:{repr(d.sentenceConceptSets[setNo][1])}', 0)
-
-                            # Check if we should mark all/some of the concepts in the concept list as used
-                            if higherConceptAsserted or (d.sc.higherConceptFound(higherConcept)):
-                                for setConcept in d.sentenceConceptFound[setNo]:        # Mark the set concepts as 'used'
-                                    for i in range(len(d.sentenceConceptFound[setNo][setConcept]['where'])):
-                                        sno, strt, k = d.sentenceConceptFound[setNo][setConcept]['where'][i]
-                                        # Check if we should mark this concepts in the concept list as used
-                                        if higherConceptAsserted or (d.sc.setConcept(higherConcept, thisConcept)):
-                                            d.sentences[sno][6][strt][k]['used'] = True
-                                        # this.logger.debug('Marking sentence concept set item at %d/%d as used', strt, k)
-                    # end of sentence concept sets
-                # concept in sentence concept set processed
-            # end of all the alternate concepts
-        # end of all the concepts in this sentence
-    # end of the sentence
-
+                        # Restart in case the same concept sequence set exists later in the sentences
+                        toFindCount = {}        # The count of the number of times each concept/negation occurs in this set
+                        for concept, isNeg in thisSet:
+                            if (concept, isNeg) not in toFindCount:
+                                toFindCount[(concept, isNeg)] = 1
+                            else:
+                                toFindCount[(concept, isNeg)] += 1
+                        conceptList = []        # The concepts in this set that have been found
+                        # Compute the last sentence for this range
+                        lastSentence = sentenceNo + sentenceRange - 1
+                        if lastSentence >= len(d.sentences):
+                            lastSentence = len(d.sentences) - 1
+                        # Compute the character position of the end of the last sentence in this range
+                        sentenceEnd = d.sentences[lastSentence][2] + d.sentences[lastSentence][3]
+                        break   # Proceed to next 'start' in this sentence
+                # end of all the alternate concepts at this point in the sentence
+            # end of all the concepts in this sentence
+        # end of the sentences
+    # end of sentence concept sequence set
 
     # Next check for any document Concept Sequence Sets - checking across all sentences
     # We test sequence sets first because they are a stricter test
@@ -1244,30 +1312,30 @@ def checkSets(history):
     # [solutionID, [[concept, isNeg]], isNeg, asserted])
 
     # check each document concept sequence set
-    for setNo, (higherConcept, thisSet, isStrict, sentenceRange, higherConceptNegated, higherConceptAsserted) in enumerate(d.documentConceptSequenceSets):
+    for setNo, (higherConcept, thisSet, sentenceRange, higherConceptNegated, asserted) in enumerate(d.documentConceptSequenceSets):
+        # sentenceRange will be '1' and should be ignored, as this is a whole of document check
         logging.debug('Checking document concept sequence set (%s)', d.documentConceptSequenceSets[setNo])
         conceptNo = 0                # Check each concept in the set in sequence
         conceptList = []            # And remember which one's we've found so we can mark them as used if we get a full set
+        concept, isNeg = thisSet[conceptNo]     # The next concept that we are looking for
+        firstConcept, firstIsNeg = thisSet[0]
         for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
+            logging.debug('checkSets - document Concept Sequence Sets - processing sentence[%d]', sentenceNo)
             document = sentence[6]    # Sentences hold mini-documents
             for thisStart in sorted(document, key=int):
-                for jj in range(len(document[thisStart])):
+                conceptFound = False                    # Concept in theSet at 'conceptNo' not yet found at thisStart
+                for jj, miniDoc in enumerate(document[thisStart]):
                     # Only check history if we are looking for history, and non-history if we are looking for non-history
-                    if document[thisStart][jj]['history'] != history:
+                    if miniDoc['history'] != history:
                         break
-
-                    thisConcept = document[thisStart][jj]['concept']
-                    thisIsNeg =  document[thisStart][jj]['negation']        # Check negation matches
-
-                    if document[thisStart][jj]['used']:        # Skip used concepts [only Findings get 'used']
+                    thisConcept =  miniDoc['concept']
+                    thisIsNeg =  miniDoc['negation']        # Check negation matches
+                    if miniDoc['used']:        # Skip used concepts [only Findings get 'used']
                         continue
-
                     # Only check concepts that we know something about - the appeared in one of our configuration files
                     if thisConcept not in d.knownConcepts:
                         continue
-
                     # Check if this is the next one in the sequence
-                    logging.debug('Checking if concept (%s) is the next concept in a document concept sequence set', thisConcept)
                     found = False
                     thisNeg = thisSet[conceptNo][1]
                     if thisConcept == thisSet[conceptNo][0]:
@@ -1276,11 +1344,30 @@ def checkSets(history):
                         elif (thisIsNeg in ['2', '3']) and (thisNeg in ['2', '3']):
                             found = True
                     if not found:
-                        logging.debug('concept(%s[%s]) is not the next concept (%s[%s]) in set[%d]', thisConcept, thisIsNeg, thisSet[conceptNo][0], thisNeg, setNo)
+                        # Check for a restart of the sequence,
+                        # We special case of a repetition of the first concept in the set
+                        # We don't handle repetitions within a set - just a repetition of the first concept
+                        # i.e.looking for concept 'n' - found concept 0 [this set, array of concepts in dict, first entry, concept]
+                        if (thisConcept == firstConcept) and ((firstIsNeg == thisIsNeg) or (firstIsNeg in ['2', '3']) and (thisIsNeg in ['2', '3'])):
+                            # Found the first concept - restart the multi-sentence counter
+                            # Compute the last sentence for this range
+                            lastSentence = sentenceNo + sentenceRange - 1
+                            if lastSentence >= len(d.sentences):
+                                lastSentence = len(d.sentences) - 1
+                            # Compute the character position of the end of the last sentence in this range
+                            sentenceEnd = d.sentences[lastSentence][2] + d.sentences[lastSentence][3]
+                            conceptList = []
+                            conceptList.append((sentenceNo, thisStart, jj))        # Add to the list of things we may need to mark as 'used'
+                            conceptNo = 1
+                            conceptFound = True
+                            logging.debug('concept(%s[%s]) is not the next concept (%s[%s]) in set[%d], but is the first - restarting',
+                                            thisConcept, thisIsNeg, concept, isNeg, setNo)
+                            break   # Proceed to next 'start' in this sentence
                         continue
-                    logging.debug('Concept (%s) [for document Concept Sequence set %d] found', thisConcept, setNo)
-                    conceptList.append([sentenceNo, thisStart, jj])            # Remember it in case we get a full set
-                    conceptNo += 1
+                    # We have the next concept from this set
+                    conceptFound = True
+                    conceptList.append((sentenceNo, thisStart, jj))        # Add to the list of things we may need to mark as 'used'
+                    logging.debug('Concept (%s) [for document Concept Sequence set:%d] found', thisConcept, setNo)
                     if conceptNo == len(thisSet):
                         # We have a full set - so save the higher concept
                         logging.info('Document concept Sequence set (%s:%s) found', higherConcept, thisSet)
@@ -1288,104 +1375,100 @@ def checkSets(history):
                                              f'documentConceptSequenceSet:{repr(thisSet)}', 0)
 
                         # Check if we should mark all/some of the concepts in the concept list as used
-                        if higherConceptAsserted or (d.sc.higherConceptFound(higherConcept)):
+                        if asserted or (d.sc.higherConceptFound(higherConcept)):
                             for item, thisList in enumerate(conceptList):
                                 sno = thisList[0]
                                 strt = thisList[1]
                                 k = thisList[2]
                                 foundConcept = d.sentences[sno][6][strt][k]['concept']
                                 # Check if we should mark this concepts in the concept list as used
-                                if higherConceptAsserted or (d.sc.setConcept(higherConcept, foundConcept)):
+                                if asserted or (d.sc.setConcept(higherConcept, foundConcept)):
                                     d.sentences[sno][6][strt][k]['used'] = True
                                 logging.debug('Marking document concept Sequence set item at %d/%d as used', strt, k)
-                        conceptNo = 0        # Reset in case there's more than one instance of this document condept Sequence set in the report
+                        conceptNo = 0        # Restart in case the same concept sequence set exists later in the sentences
                         conceptList = []
+                        # Compute the last sentence for this range
+                        lastSentence = sentenceNo + sentenceRange - 1
+                        if lastSentence >= len(d.sentences):
+                            lastSentence = len(d.sentences) - 1
+                        # Compute the character position of the end of the last sentence in this range
+                        sentenceEnd = d.sentences[lastSentence][2] + d.sentences[lastSentence][3]
+                        break   # Proceed to next 'start' in this sentence
                     # end of list of things to check
-                # end of all the alternate concepts
+                # end of all the alternate concepts at this point in the sentence
             # end of all the concepts in this sentence
         # end of all this sentences
     # end of the document concept sequence set
 
 
     # Now check for any Document Concept Sets - checking across all sentences
-    documentConceptSetFound = {}        # The higher concepts found in this document - so we don't add them more than once
-    for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
-        # this.logger.debug('checkSets Document concept sets - processing sentence[%d]', sentenceNo)
-        sentenceStart = sentence[2]
-        sentenceLength = sentence[3]
-        document = sentence[6]    # Sentences hold mini-documents
+    for setNo, (higherConcept, thisSet, sentenceRange, higherConceptNegated, asserted) in enumerate(d.documentConceptSets):
+        # sentenceRange will be '1' and should be ignored, as this is a whole of document check
+        logging.debug('Checking document Concept set (%s) [%s]', d.documentConceptSets[setNo], history)
+        if len(thisSet) == 0:       # Empty concept list
+            continue
+        toFindCount = {}        # The count of the number of times each concept/negation occurs in this set
+        for concept, isNeg in thisSet:
+            if (concept, isNeg) not in toFindCount:
+                toFindCount[(concept, isNeg)] = 1
+            else:
+                toFindCount[(concept, isNeg)] += 1
+        conceptList = []        # The concepts in this set that have been found
+        for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
+            logging.debug('checkSets - document Concept Sets - processing sentence[%d]', sentenceNo)
+            document = sentence[6]        # Sentences hold mini-documents
+            for thisStart in sorted(document, key=int):        # We step through all concepts in each sentence
+                for jj, miniDoc in enumerate(document[thisStart]):    # Step through the list of alternate concepts at this point in this sentence
+                    # Only check history if we are looking for history, and non-history if we are looking for non-history
+                    if miniDoc['history'] != history:
+                        break
+                    if miniDoc['used']:        # Skip used concepts
+                        continue
+                    # Ignore any concept who's text extends beyond this sentence range
+                    if thisStart + miniDoc['length'] > sentenceEnd:
+                        continue
+                    thisConcept = miniDoc['concept']        # This concept
+                    thisIsNeg = miniDoc['negation']        # And it's negation
+                    # Only check concepts that we know something about - the appeared in one of our configuration files
+                    if thisConcept not in d.knownConcepts:
+                        continue
+                    # Check if this alternate concept, at 'start', is in this sentence concept set
+                    if (thisConcept, thisIsNeg) not in toFindCount:
+                        continue
+                    if toFindCount[(thisConcept, thisIsNeg)] == 0:      # All required instances already found
+                        continue
+                    toFindCount[(thisConcept, thisIsNeg)] -= 1
+                    conceptList.append((sentenceNo, thisStart, jj))        # Add to the list of things we may need to mark as 'used'
+                    logging.debug('Concept (%s) [for document Concept set:%d] found', thisConcept, setNo)
+                    if len(conceptList) == len(thisSet):
+                        # We have a full concept set - so save the higher concept - append the higher concept to the list of alternates
+                        logging.info('Sentence concept set (%s:%s) found', higherConcept, thisSet)
+                        addAdditionalConcept(higherConcept, sentenceNo, thisStart, jj, None, higherConceptNegated,
+                                            f'sentenceConceptSequenceSet:{repr(thisSet)}', 0)
 
-        # Now look for concepts in this sentence that are in a sentence or document concept set
-        # There is a philosophical bias here - implied diagnosis and implied sites trump what is actually stated.
-        # We step through all concepts in this sentence
-        for thisStart in sorted(document, key=int):
-            for jj in range(len(document[thisStart])):            # Step through the list of alternate concepts at this point in this sentence
-                # Only check history if we are looking for history, and non-history if we are looking for non-history
-                if document[thisStart][jj]['history'] != history:
-                    break
+                        # Check if we should mark all/some of the concepts in the concept list as used
+                        if (asserted) or (d.sc.higherConceptFound(higherConcept)):
+                            for sno, strt, k in conceptList:
+                                foundConcept = d.sentences[sno][6][strt][k]['concept']
+                                # Check if we should mark this concepts in the concept list as used
+                                if asserted or (d.sc.setConcept(higherConcept, foundConcept)):
+                                    d.sentences[sno][6][strt][k]['used'] = True
+                                    logging.debug('Marking sentence concept sequence set item at %d/%d as used', strt, k)
 
-                thisConcept = document[thisStart][jj]['concept']
-                thisIsNeg = document[thisStart][jj]['negation']        # Check negation matches
+                        # Restart in case the same concept sequence set exists later in the sentences
+                        toFindCount = {}        # The count of the number of times each concept/negation occurs in this set
+                        for concept, isNeg in thisSet:
+                            if (concept, isNeg) not in toFindCount:
+                                toFindCount[(concept, isNeg)] = 1
+                            else:
+                                toFindCount[(concept, isNeg)] += 1
+                        conceptList = []        # The concepts in this set that have been found
+                        break   # Proceed to next 'start' in this sentence
+                # end of all the alternate concepts at this point in the sentence
+            # end of all the concepts in this sentence
+        # end of the sentences
+    # end of sentence concept sequence set
 
-                if document[thisStart][jj]['used']:        # Skip used concepts [only Findings get 'used']
-                    continue
-
-
-                # Only check concepts that we know something about - the appeared in one of our configuration files
-                if thisConcept not in d.knownConcepts:
-                    continue
-
-                # Check if any of the concepts in this sentence are in one of the document concept sets
-                if thisConcept in d.inDocumentConceptSets:                    # this concept is in at least on concept set
-                    for setNo in d.inDocumentConceptSets[thisConcept]:                # check each concept set that contains this concept
-                        logging.debug('Checking if concept(%s[%d:%d/%d]) is in document concept set[%d](%s)', thisConcept, sentenceNo, thisStart, jj, setNo, d.documentConceptSets[setNo])
-                        higherConcept = d.documentConceptSets[setNo][0]
-                        thisSet = d.documentConceptSets[setNo][1]
-                        higherConceptNegated = d.documentConceptSets[setNo][2]
-                        higherConceptAsserted = d.documentConceptSets[setNo][3]
-                        if higherConcept in documentConceptSetFound:    # the higher concept  has already been been found
-                            continue
-                        fullSet = True
-                        for setConcept in thisSet:        # check each concept in the set
-                            found = False
-                            if setConcept == thisConcept:            # required item, so check if it has been found
-                                thisNeg = thisSet[setConcept]['isNeg']
-                                if thisIsNeg == thisNeg:
-                                    found = True
-                                elif (thisIsNeg in ['2', '3']) and (thisNeg in ['2', '3']):
-                                    found = True
-                            if found:
-                                logging.debug('Concept (%s) [for document Concept set %d] found', thisConcept, setNo)
-                                if setNo not in d.documentConceptFound:
-                                    d.documentConceptFound[setNo] = {}
-                                if setConcept not in d.documentConceptFound[setNo]:
-                                    d.documentConceptFound[setNo][setConcept] = {}
-                                    d.documentConceptFound[setNo][setConcept]['where'] = []
-                                d.documentConceptFound[setNo][setConcept]['found'] = True
-                                d.documentConceptFound[setNo][setConcept]['where'].append([sentenceNo, thisStart, jj])
-                            elif not d.documentConceptFound[setNo][setConcept]['found']:        # an item hasn't been found
-                                fullSet = False                    # at least one item remains missing
-                        if fullSet:            # the concept set is full - append the higher concept to the list of alternates
-                            logging.info('Document concept set (%s:%s) found', higherConcept, d.documentConceptFound[setNo])
-                            documentConceptSetFound[higherConcept] = True        # full concept set found so mark the higher concept as found and save it
-                            addAdditionalConcept(higherConcept, sentenceNo, thisStart, jj, None, higherConceptNegated,
-                                                 f'documentConceptSet:{repr(thisSet)}', 0)
-
-                            # Check if we should mark all/some of the concepts in the concept list as used
-                            if higherConceptAsserted or (d.sc.higherConceptFound(higherConcept)):
-                                for thisConcept in d.documentConceptFound[setNo]:        # Mark the set concepts as 'used'
-                                    for i in range(len(d.documentConceptFound[setNo][thisConcept]['where'])):
-                                        sno, strt, k = d.documentConceptFound[setNo][thisConcept]['where'][i]
-                                        # Check if we should mark this concepts in the concept list as used
-                                        if higherConceptAsserted or (d.sc.setConcept(higherConcept, thisConcept)):
-                                            logging.debug('Marking document concept set item at %d/%d as used', strt, k)
-                                            d.sentences[sno][6][strt][k]['used'] = True
-                        # end of document concept sets
-                    # concept processed
-                # end of list of concepts to check
-            # end of all the alternate concepts
-        # end of all the concepts in this sentence
-    # end of the sentence
     return
 
 

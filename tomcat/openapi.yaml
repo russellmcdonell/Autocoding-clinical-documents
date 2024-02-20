@@ -1,0 +1,58 @@
+openapi: 3.0.1
+info:
+  description: MetaMapLite - extract UMLS concepts from clinical document text
+  version: 1.0.0
+  title: MetaMapLite as a Tomcat servelet
+  contact:
+    email: russell.mcdonell@c-cost.com
+servers:
+  - url: localhost:8080/AutoCoding/MetaMapLite
+paths:
+  /:
+    post:
+      summary: Extract UMLS Concepts from text
+      description: MetaMapLite as a Tomcat servelet to process text and return UMLS Concepts
+      operationId: AutocodeHisto
+      consumes:
+      - application/x-www-form-urlencoded
+      produces:
+      - application/json
+      parameters:
+      - in: body
+        name: document
+        description: clinical document text
+        required: true
+        schema:
+          $ref: '#/definitions/document'
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/UMLSdata'
+definitions:
+  document:
+    type: string
+  UMLSdata:
+    type: object
+    properties:
+      sentences:
+        type: array
+        items:
+          format: string
+      concepts:
+        type: array
+        items:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              start:
+                type: string
+              length:
+                type: string
+              partOfSpeech:
+                type: string
+              text:
+                type: string
+              isNegated:
+                type: string

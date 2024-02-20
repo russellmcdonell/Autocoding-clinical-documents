@@ -47,7 +47,7 @@ Modifiers are done
     The port for the AutoCoding service on the MetaMapLite Server (default="8080")
 
     -U URL|--MetaMapLiteURL=URL
-    The URL for the AutoCoding service on the MetaMapLite Server (default="localhost"")
+    The URL for the AutoCoding service on the MetaMapLite Server (default="/AutoCoding/MetaMapLite")
 
     -v loggingLevel|--verbose=loggingLevel
     Set the level of logging that you want.
@@ -215,8 +215,8 @@ def AutoCode():
 
     # Prepare the clinical document
     cleanDocument()
-    print(f'raw:{d.rawClinicalDocument}')
-    print(f'prepared:{d.preparedDocument}')
+    logging.debug('raw document:\n%s\n', d.rawClinicalDocument)
+    logging.debug('prepared document:\n%s\n', d.preparedDocument)
 
     # logging.info('Text document after labels, terms preamble, terms and lists changed')
     # logging.info(d.preparedDocument)
@@ -519,8 +519,8 @@ def complete():
                 # Add to min-document
                 document = sentence[6]    # Sentences hold mini-documents
                 if thisStart not in document:
-                    document[start] = []
-                miniDoc = len(document[start])
+                    document[thisStart] = []
+                miniDoc = len(document[thisStart])
                 document[thisStart].append({})
                 document[thisStart][miniDoc]['length'] = match.end() - match.start()
                 document[thisStart][miniDoc]['history'] = isHistory
@@ -532,9 +532,9 @@ def complete():
 
                 # With a description if we have one
                 if thisConcept in d.solutionMetaThesaurus:
-                    document[start][miniDoc]['description'] = d.solutionMetaThesaurus[thisConcept]['description']
+                    document[thisStart][miniDoc]['description'] = d.solutionMetaThesaurus[thisConcept]['description']
                 else:
-                    document[start][miniDoc]['description'] = commonText
+                    document[thisStart][miniDoc]['description'] = commonText
 
                 # Check if we need to modify this concept
                 f.checkModified(thisConcept, thisIsNeg, sentenceNo, thisStart, miniDoc)
@@ -612,8 +612,8 @@ def complete():
         lastNegation = None        # Last concept was not negated - because there wasn't one
         for thisStart in sorted(document, key=int):        # We step through all concepts, in sequence across this sentence
             # Stop extending negation if we are crossing a but boundary
-            while (thisBut is not None) and (buts[thisBut] <= start):
-                logging.debug('Crossing a butBoundary at %d in sentence %d', start, sentenceNo)
+            while (thisBut is not None) and (buts[thisBut] <= thisStart):
+                logging.debug('Crossing a butBoundary at %d in sentence %d', thisStart, sentenceNo)
                 lastNegation = None        # Last concept was not negated - because there wasn't one - we just crossed a but boundary
                 thisBut += 1
                 # Check if we've crossed the last but boundary
@@ -801,7 +801,7 @@ if __name__ == '__main__':
     requiredColumns = ['Common', 'Technical']
     f.loadSimpleCompileSheet(wb, 'prepare', 'terms', requiredColumns, None, None, True, True, d.terms)
     requiredColumns = ['Preamble markers', 'isCase', 'isStart']
-    f.loadBoolComileWorksheet(wb, 'prepare', 'preamble markers', requiredColumns, None, None, True, d.preambleMarkers)
+    f.loadBoolCompileWorksheet(wb, 'prepare', 'preamble markers', requiredColumns, None, None, True, d.preambleMarkers)
     requiredColumns = ['Preamble terms', 'Technical']
     f.loadSimpleCompileSheet(wb, 'prepare', 'preamble terms', requiredColumns, None, None, True, True, d.preambleTerms)
 
@@ -826,7 +826,7 @@ if __name__ == '__main__':
     # Check the solution 'complete' Excel workbook
     wb = load_workbook(os.path.join('solutions', d.solution, 'complete.xlsx'))
     requiredColumns = ['History markers', 'isCase', 'isStart']
-    f.loadBoolComileWorksheet(wb, 'complete', 'history markers', requiredColumns, None, None, True, d.historyMarkers)
+    f.loadBoolCompileWorksheet(wb, 'complete', 'history markers', requiredColumns, None, None, True, d.historyMarkers)
     requiredColumns = ['Pre history']
     f.loadSimpleCompileSheet(wb, 'complete', 'pre history', requiredColumns, None, None, True, True, d.preHistory)
     requiredColumns = ['Section markers', 'Section', 'isCase']
@@ -888,26 +888,26 @@ if __name__ == '__main__':
         if row.Start_Negation is None:
             break
         # logging.debug("sheet(gross negations)), columns(%s), row(%s)", requiredColumns, row)
-        start = re.compile(f.checkPattern(row.Start_Negation), flags=re.IGNORECASE|re.DOTALL)
-        end = re.compile(f.checkPattern(row.End_Negation), flags=re.IGNORECASE|re.DOTALL)
+        startNeg = re.compile(f.checkPattern(row.Start_Negation), flags=re.IGNORECASE|re.DOTALL)
+        endNeg = re.compile(f.checkPattern(row.End_Negation), flags=re.IGNORECASE|re.DOTALL)
         sentences = int(row.Sentences)
-        d.grossNegation.append((start, end, sentences))
+        d.grossNegation.append((startNeg, endNeg, sentences))
     requiredColumns = ['SolutionID', 'Section', 'Negate', 'MetaThesaurusIDs']
     f.loadNegationListWorksheet(wb, 'complete', 'sentence negation lists', requiredColumns, d.sentenceNegationLists)
     f.loadNegationListWorksheet(wb, 'complete', 'document negation lists', requiredColumns, d.documentNegationLists)
     requiredColumns = ['SolutionID', 'Asserted', 'MetaThesaurus or Solution IDs']
-    f.loadConceptSetsWorksheeet(wb, 'complete', 'sent strict seq concept sets', requiredColumns, True, d.sentenceConceptSequenceSets)
-    f.loadConceptSetsWorksheeet(wb, 'complete', 'sentence sequence concept sets', requiredColumns, False, d.sentenceConceptSequenceSets)
+    f.loadSequenceConceptSetsWorksheet(wb, 'complete', 'sent strict seq concept sets', requiredColumns, True, d.sentenceConceptSequenceSets)
+    f.loadSequenceConceptSetsWorksheet(wb, 'complete', 'sentence sequence concept sets', requiredColumns, False, d.sentenceConceptSequenceSets)
     requiredColumns = ['SolutionID', 'Sentences', 'Asserted', 'MetaThesaurus or Solution IDs']
-    f.loadConceptSetsWorksheeet(wb, 'complete', 'multi sent strict seq conc sets', requiredColumns, True, d.sentenceConceptSequenceSets)
-    f.loadConceptSetsWorksheeet(wb, 'complete', 'multi sentence seq concept sets', requiredColumns, False, d.sentenceConceptSequenceSets)
+    f.loadSequenceConceptSetsWorksheet(wb, 'complete', 'multi sent strict seq conc sets', requiredColumns, True, d.sentenceConceptSequenceSets)
+    f.loadSequenceConceptSetsWorksheet(wb, 'complete', 'multi sentence seq concept sets', requiredColumns, False, d.sentenceConceptSequenceSets)
     requiredColumns = ['SolutionID', 'Asserted', 'MetaThesaurus or Solution IDs']
-    f.loadConceptSetsWorksheeet(wb, 'complete', 'sentence concept sets', requiredColumns, True, d.sentenceConceptSets)
+    f.loadConceptSetsWorksheet(wb, 'complete', 'sentence concept sets', requiredColumns, d.sentenceConceptSets)
     requiredColumns = ['SolutionID', 'Sentences', 'Asserted', 'MetaThesaurus or Solution IDs']
-    f.loadConceptSetsWorksheeet(wb, 'complete', 'multi sentence concept sets', requiredColumns, True, d.sentenceConceptSets)
+    f.loadConceptSetsWorksheet(wb, 'complete', 'multi sentence concept sets', requiredColumns, d.sentenceConceptSets)
     requiredColumns = ['SolutionID', 'Asserted', 'MetaThesaurus or Solution IDs']
-    f.loadConceptSetsWorksheeet(wb, 'complete', 'document sequence concept sets', requiredColumns, True, d.documentConceptSequenceSets)
-    f.loadConceptSetsWorksheeet(wb, 'complete', 'document concept sets', requiredColumns, True, d.documentConceptSets)
+    f.loadConceptSetsWorksheet(wb, 'complete', 'document sequence concept sets', requiredColumns, d.documentConceptSequenceSets)
+    f.loadConceptSetsWorksheet(wb, 'complete', 'document concept sets', requiredColumns, d.documentConceptSets)
     requiredColumns = ['MetaThesaurus code']
     this_df = f.checkWorksheet(wb, 'complete', 'other concepts', requiredColumns, True)
     d.otherConcepts = set(this_df['MetaThesaurus_code'].unique())
