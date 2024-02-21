@@ -9,6 +9,7 @@ import sys
 import logging
 import re
 import functions as f
+import excelFunctions as excel
 import data as d
 
 
@@ -25,7 +26,7 @@ def configure(wb):
 
     # Read in the List Markers which are at the start of lines
     requiredColumns = ['List markers', 'isCase']
-    this_df = f.checkWorksheet(wb, 'prepare', 'List markers', requiredColumns, True)
+    this_df = excel.checkWorksheet(wb, 'prepare', 'List markers', requiredColumns, True)
     for row in this_df.itertuples():
         if row.List_markers is None:
             break
@@ -35,12 +36,12 @@ def configure(wb):
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
         if row.isCase:      # marker is case sensitive
-            marker = re.compile(f.checkPattern(r'^' + row.List_markers), flags=re.DOTALL)
+            marker = re.compile(excel.checkPattern(r'^' + row.List_markers), flags=re.DOTALL)
         else:
-            marker = re.compile(f.checkPattern(r'^' + row.List_markers), flags=re.IGNORECASE|re.DOTALL)
+            marker = re.compile(excel.checkPattern(r'^' + row.List_markers), flags=re.IGNORECASE|re.DOTALL)
         d.sd.listMarkers.append(marker)
     requiredColumns = ['Hyphenated words']
-    this_df = f.checkWorksheet(wb, 'prepare', 'Hyphenated words', requiredColumns, True)
+    this_df = excel.checkWorksheet(wb, 'prepare', 'Hyphenated words', requiredColumns, True)
     for row in this_df.itertuples():
         if row.Hyphenated_words is None:
             break
@@ -140,7 +141,7 @@ def solutionCleanDocument():
     return
 
 
-def checkPreamble(text):
+def solutionCheckPreamble(text):
     '''
     Check for any solution specific markers that indicate the start of a preamble section (not the body of the text document)
     Here text is whole document.
@@ -169,7 +170,7 @@ def checkPreamble(text):
     return -1
 
 
-def checkNotPreamble(text):
+def solutionCheckNotPreamble(text):
     '''
     Check for any solution specific markers that indicate the end of a preamble section (not the body of the text document)
     Here text is whole document.

@@ -8,8 +8,10 @@ import os
 import sys
 import argparse
 import logging
-import re
-import pandas as pd
+import json
+from urllib.parse import urlencode
+from http import client
+import checkFunctions as ch
 import data as d
 
 
@@ -95,1380 +97,6 @@ def doArguments(parser, isFlask):
         else:
             logging.basicConfig(format=logfmt, datefmt='%d/%m/%y %H:%M:%S %p')
     logging.debug('Logging set up')
-    return
-
-def cleanColumnHeadings(columns):
-    '''
-    Clean column headings and convert them to valid Python names so that
-    Pandas dataframe will play nice when you do itertuples() [requires valid Python names for columns]
-    Parameters
-        columns         - list, the worksheet column headings
-    Returns
-        cleanColumns    - list, worksheet columns converted into valid python names
-    '''
-    cleanColumns = list(columns)
-    lastHeading = ''
-    for i, col in enumerate(cleanColumns):
-        if col is None:
-            cleanColumns[i] = lastHeading + '_' + str(i)
-        else:
-            cleanColumns[i] = d.cleanPython.sub('_', col)
-            lastHeading = cleanColumns[i]
-    return cleanColumns
-
-
-def checkWorksheet(wb, workbookName, sheet, columns, exact):
-    '''
-    Check that a worksheet exist in the workbook and that the sheet has the required column headings.
-    Parameters
-        wb              - an openpyxl workbook containing configuration data
-        workbookName    - str, the name of the workbook/part of the solution
-        sheet           - str, the name of the sheet to be loaded
-        columns         - list(str), the list of columns required/to be loaded
-        exact           - boolean, True of only the required columns are to be loaded
-    Returns
-        sheet_df        - pandas dataframe, the loaded data
-    '''
-    # Check that this worksheet exits
-    if sheet not in wb.sheetnames:
-        logging.critical('No sheet named "%s" in workbook "%s"', sheet, workbookName)
-        logging.shutdown()
-        sys.exit(d.EX_CONFIG)
-
-    # Check this worksheet
-    ws = wb[sheet]
-    row0 = list(ws.rows)[0]
-    headings = []
-    for heading in row0:
-        headings.append(heading.value)
-
-    # Make sure the required columns in the this worksheet are present
-    for col in columns:
-        if col not in headings:
-            logging.critical('Missing heading "%s" in worksheet "%s" in workbook "%s"', col, sheet, workbookName)
-            logging.shutdown()
-            sys.exit(d.EX_CONFIG)
-
-    # Check any codes that need to be in a code table
-    data = ws.values
-    headings = cleanColumnHeadings(next(data))
-    sheet_df = pd.DataFrame(list(data), columns=tuple(headings))
-    if exact:
-        newColumns = cleanColumnHeadings(columns)
-        sheet_df = sheet_df[sheet_df.columns.intersection(newColumns)]
-    return sheet_df
-
-
-def checkPattern(pattern):
-    '''
-    Check a regular expression pattern and bound it with \b if appropriate
-    Parameters
-        pattern         - str, the pattern to be checked/fixed
-    Returns
-        returnPattern   - The modified (if necessary) pattern
-    '''
-    if pattern == '':
-        return ''
-    returnPattern = ''
-    if pattern[0].isalnum():
-        returnPattern = r'\b'
-    returnPattern += pattern
-    if pattern[-1].isalnum():
-        returnPattern += r'\b'
-    return returnPattern
-
-
-def checkConfigConcept(concept):
-    '''
-    Check if a configuration concept is negated or ambigous
-    We check the first character (which is normally the letter 'C' as all MetaThesaurus concepts start with the letter 'C')
-    If the first character is '-' then we strip it off and declare the remaining characters a negated concept
-    If the first character is '?' then we strip it off and declare the remaining characters an ambiguous concept
-    NOTE: we assume concepts all start with either 'C' or '-C' or '?C', but we do not check.
-    Parameters
-        concept     - str, the concept to be checked
-    Returns
-        newConcept  - str, the concept stripped of any negation or ambiguity character
-        isNeg       - str, one character indicating the negation or ambiguity of the concept
-    '''
-
-    newConcept = concept
-    isNeg = '0'
-    if concept[0] == '-':
-        newConcept = concept[1:]
-        isNeg = '1'
-    elif concept[0] == '?':
-        newConcept = concept[1:]
-        isNeg = '2'
-    return newConcept, isNeg
-
-
-def loadSimpleSheet(wb, workbook, sheet, columns, target):
-    '''
-    Load a simple worksheet into the target as a list of lists
-    Parameters
-        wb              - an openpyxl workbook containing configuration data
-        workbookName    - str, the name of the workbook/part of the solution
-        sheet           - str, the name of the sheet to be loaded
-        columns         - list(str), the list of columns required/to be loaded
-        target          - data structure where the data is to be loaded
-    Returns
-        Nothing
-    '''
-    this_df = checkWorksheet(wb, workbook, sheet, columns, True)
-    thisData = this_df.values.tolist()
-    for record in thisData:
-        if record[0] is None:
-            break
-        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
-        target.append(record)
-    return
-
-
-def loadSimpleDictionarySheet(wb, workbook, sheet, columns, skip, target):
-    '''
-    Load a simple worksheet of keys and (list of) values into the target as a dictionary
-    Parameters
-        wb              - an openpyxl workbook containing configuration data
-        workbookName    - str, the name of the workbook/part of the solution
-        sheet           - str, the name of the sheet to be loaded
-        columns         - list(str), the list of columns required/to be loaded
-        skip            - int, the number of columns to skip after the first
-        target          - data structure where the data is to be loaded
-    Returns
-        Nothing
-    '''
-    this_df = checkWorksheet(wb, workbook, sheet, columns, True)
-    thisData = this_df.values.tolist()
-    for record in thisData:
-        if record[0] is None:
-            break
-        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
-        target[record[0]] = record[1 + skip:]
-    return
-
-
-def loadSimpleCompileSheet(wb, workbook, sheet, columns, pretext, posttext, ignorecase, dotall, target):
-    '''
-    Load a simple worksheet into the target as a list of tuples
-    where the first value in each tuple is a compiled regular expression
-    Parameters
-        wb              - an openpyxl workbook containing configuration data
-        workbookName    - str, the name of the workbook/part of the solution
-        sheet           - str, the name of the sheet to be loaded
-        columns         - list(str), the list of columns required/to be loaded
-        pretext         - str or None, any text to be prepended to the data in the first column before it is compiled
-        posttext        - str or None, any text to be appended to the data in the first column before it is compiled
-        ignorecase      - boolean, True if the compiled expression should be flagged with re.IGNORECASE
-        dotall          - boolean, True if the compiled expression should be flagged with re.DOTALL
-        target          - data structure where the data is to be loaded
-    Returns
-        Nothing
-    '''
-    this_df = checkWorksheet(wb, workbook, sheet, columns, True)
-    thisData = this_df.values.tolist()
-    for record in thisData:
-        if record[0] is None:
-            break
-        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
-        reText = checkPattern(record[0])
-        if pretext is not None:
-            reText = pretext + reText
-        if posttext is not None:
-            reText = reText + posttext
-        if ignorecase is not None:
-            if dotall is not None:
-                compText = re.compile(reText, flags=re.IGNORECASE|re.DOTALL)
-            else:
-                compText = re.compile(reText, flags=re.IGNORECASE)
-        elif dotall is not None:
-            compText = re.compile(reText, flags=re.DOTALL)
-        else:
-            compText = re.compile(reText)
-        if len(columns) == 1:
-            target.append(compText)
-        else:
-            target.append(tuple([compText] + record[1:]))
-    return
-
-
-def loadBoolCompileWorksheet(wb, workbook, sheet, columns, pretext, posttext, dotall, target):
-    '''
-    Load a worksheet which has isCase and/or isStart into the target as a list of tuples
-    where the first value in each tuple is a compiled regular expression
-    Parameters
-        wb              - an openpyxl workbook containing configuration data
-        workbookName    - str, the name of the workbook/part of the solution
-        sheet           - str, the name of the sheet to be loaded
-        columns         - list(str), the list of columns required/to be loaded
-        pretext         - str or None, any text to be prepended to the data in the first column before it is compiled
-        posttext        - str or None, any text to be appended to the data in the first column before it is compiled
-        dotall          - boolean, True if the compiled expression should be flagged with re.DOTALL
-        target          - data structure where the data is to be loaded
-    Returns
-        Nothing
-    '''
-    this_df = checkWorksheet(wb, workbook, sheet, columns, True)
-    thisData = this_df.values.tolist()
-    try:
-        isCase = columns.index('isCase')
-    except ValueError:
-        logging.fatal('Missing "isCase" column in worksheet(%s) in workbook(%s) in solution folder "%s"', sheet, workbook, d.solution)
-        logging.shutdown()
-        sys.exit(d.EX_CONFIG)
-    try:
-        isStart = columns.index('isStart')
-    except ValueError:
-        isStart = -1
-    for record in thisData:
-        if record[0] is None:
-            break
-        logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
-        reText = checkPattern(record[0])
-        if pretext is not None:
-            reText = pretext + reText
-        if posttext is not None:
-            reText = reText + posttext
-        if not isinstance(record[isCase], bool):
-            logging.critical('Invalid value for isCase (%s) in worksheet(%s) in workbook(%s) in solution folder "%s"', record[isCase], sheet, workbook, d.solution)
-            logging.shutdown()
-            sys.exit(d.EX_CONFIG)
-        if isStart != -1:       # If  isStart is a heading then we check that the data is also boolean
-            if not isinstance(record[isStart], bool):
-                logging.critical('Invalid value for isStart (%s) in worksheet(%s) in workbook(%s) in solution folder "%s"', record[isStart], sheet, workbook, d.solution)
-                logging.shutdown()
-                sys.exit(d.EX_CONFIG)
-        if record[isCase]:
-            if dotall is not None:
-                compText = re.compile(reText, flags=re.DOTALL)
-            else:
-                compText = re.compile(reText)
-        elif dotall is not None:
-            compText = re.compile(reText, flags=re.IGNORECASE|re.DOTALL)
-        else:
-            compText = re.compile(reText, flags=re.IGNORECASE)
-        if len(columns) == 1:
-            target.append(compText)
-        elif isCase < (len(columns) - 1):
-            target.append(tuple([compText] + record[1:isCase] + record[isCase + 1:]))
-        else:
-            target.append(tuple([compText] + record[1:isCase]))
-    return
-
-
-def loadCompileConceptsWorksheet(wb, workbook, sheet, columns, pretext, posttext, target):
-    '''
-    Load a worksheet into the target as a list of lists
-    where the first value in each list is a compiled regular expression
-    and the remaining list items are conceptIDs (variable length lists)
-    Parameters
-        wb              - an openpyxl workbook containing configuration data
-        workbookName    - str, the name of the workbook/part of the solution
-        sheet           - str, the name of the sheet to be loaded
-        columns         - list(str), the list of columns required/to be loaded
-        pretext         - str or None, any text to be prepended to the data in the first column before it is compiled
-        posttext        - str or None, any text to be appended to the data in the first column before it is compiled
-        target          - data structure where the data is to be loaded
-    Returns
-        Nothing
-    '''
-    this_df = checkWorksheet(wb, workbook, sheet, columns, False)
-    thisData = this_df.values.tolist()
-    for record in thisData:
-        if record[0] is None:
-            break
-        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
-        reText = checkPattern(record[0])
-        if pretext is not None:
-            reText = pretext + reText
-        if posttext is not None:
-            reText = reText + posttext
-        compText = re.compile(reText, flags=re.IGNORECASE|re.DOTALL)
-        concepts = []
-        j = 1
-        while (j < len(record)) and (record[j] is not None):
-            concepts.append(record[j])
-            d.knownConcepts.add(record[j])
-            j += 1
-        if len(columns) == 1:
-            target.append([compText])
-        else:
-            target.append([compText] + concepts)
-
-
-def loadCompileCompileWorksheet(wb, workbook, sheet, columns, pretext, target):
-    '''
-    Load a worksheet into the target as a list of tuples
-    where the first tuple value is a compiled regular expression
-    and the second tuple value is either a compiled regular expression or None
-    Parameters
-        wb              - an openpyxl workbook containing configuration data
-        workbookName    - str, the name of the workbook/part of the solution
-        sheet           - str, the name of the sheet to be loaded
-        columns         - list(str), the list of columns required/to be loaded
-        pretext         - str or None, any text to be prepended to the data before it is compiled
-        target          - data structure where the data is to be loaded
-    Returns
-        Nothing
-    '''
-    this_df = checkWorksheet(wb, workbook, sheet, columns, True)
-    thisData = this_df.values.tolist()
-    for record in thisData:
-        if record[0] is None:
-            break
-        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
-        reText = checkPattern(record[0])
-        if pretext is not None:
-            reText = pretext + reText
-        compText = re.compile(reText, flags=re.IGNORECASE|re.DOTALL)
-        if record[1] is not None:
-            rexText = checkPattern(record[1])
-            if pretext is not None:
-                rexText = pretext + rexText
-            exCompText = re.compile(rexText, flags=re.IGNORECASE|re.DOTALL)
-            target.append((compText, exCompText))
-        else:
-            target.append((compText, None))
-    return
-
-
-def loadModifierWorksheet(wb, workbook, sheet, columns, pretext, posttext, target):
-    '''
-    Load a worksheet into the target as a dictionary of tuples
-    where the key is a SolutionID, the first tuple value is whether not the SolutionID is negated,
-    the second tuple value is the new SolutionID, the third tuple value is whether or not the new SolutionID is negated
-    and the fourth tuple value is the regular expression that triggers modifying the first SolutionID into the second SolutionID
-    Parameters
-        wb              - an openpyxl workbook containing configuration data
-        workbookName    - str, the name of the workbook/part of the solution
-        sheet           - str, the name of the sheet to be loaded
-        columns         - list(str), the list of columns required/to be loaded
-        pretext         - str or None, any text to be prepended to Modifier before it is compiled
-        posttext        - str or None, any text to be appended to the Modifier before it is compiled
-        target          - data structure where the data is to be loaded
-    Returns
-        Nothing
-    '''
-    this_df = checkWorksheet(wb, workbook, sheet, columns, True)
-    for row in this_df.itertuples():
-        if row.MetaThesaurusID is None:
-            break
-        # logging.debug("sheet(%s), columns(%s), row(%s)", sheet, columns, row)
-        concept, oldNeg = checkConfigConcept(row.MetaThesaurusID)
-        d.knownConcepts.add(concept)
-        newConcept, newNeg = checkConfigConcept(row.SolutionID)
-        d.knownConcepts.add(newConcept)
-        Modifier = checkPattern(row.Modifier)
-        if pretext is not None:
-            Modifier = pretext + Modifier
-        if posttext is not None:
-            Modifier = Modifier + posttext
-        compText = re.compile(Modifier, flags=re.IGNORECASE|re.DOTALL)
-        target[concept] = (oldNeg, newConcept, newNeg, compText)
-    return
-
-
-def loadNegationListWorksheet(wb, workbook, sheet, columns, target):
-    '''
-    Load a worksheet into the target as a dictionary.
-    The key is the SolutionID which, if negated, triggers document modification.
-    The value is child dictionary where the key is the section to which this negation is applicable.
-    The value of the child dictionary is another dictiony.
-    The key of this grandchild dictionary is a boolean which indicates whether the matching concepts
-    in the following list should be negated or made ambiguous.
-    The value of this grandchild dictionary is the list of matching concepts. 
-    Parameters
-        wb              - an openpyxl workbook containing configuration data
-        workbookName    - str, the name of the workbook/part of the solution
-        sheet           - str, the name of the sheet to be loaded
-        columns         - list(str), the list of columns required/to be loaded
-        target          - data structure where the data is to be loaded
-    Returns
-        Nothing
-    '''
-    this_df = checkWorksheet(wb, workbook, sheet, columns, False)
-    thisData = this_df.values.tolist()
-    for record in thisData:
-        if record[0] is None:
-            break
-        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
-        solutionID = record[0]
-        section = record[1]
-        negate = record[2]
-        concepts = []
-        j = 3
-        while (j < len(record)) and (record[j] is not None):
-            concepts.append(record[j])
-            d.knownConcepts.add(record[j])
-            j += 1
-        d.knownConcepts.add(solutionID)
-        target[solutionID] = {}
-        target[solutionID][section] = {}
-        target[solutionID][section][negate] = concepts
-    return
-
-
-def loadSequenceConceptSetsWorksheet(wb, workbook, sheet, columns, isStrict, target):
-    '''
-    Load a worksheet into the target as a list of tuples
-    where the first tuple element is a Solution ID.
-    The second tuple element is a list of tuples, being pairs of MetaThesaurusIDs and a ternary value indicating
-    whether the MetaThesaurusID is asserted, negated or ambiguous.
-    This is the set of concepts being searched for in the clincial document.
-    The third tuple element is a boolean indicating these concepts occur in a strict sequence (no intervening concepts).
-    The fourth tuple element is the maximum number of sentence within which this sequence must occur.
-    The fifth tuple element is a ternary value indicating whether the Solution ID is asserted, negated or ambiguous.
-    The sixth tuple element indicates wherter or not all the matched MetaThesaurusIDs should be deemed 'Used'
-    when the set if found and the Solution ID added to the document. That is, concepts found to match the set
-    are deemed 'Used' and cannot participate in any further set or matching operations.
-    e.g. (SolutionID, [(concept, isNeg)], isStrict, sentences, isNeg, asserted)
-    Parameters
-        wb              - an openpyxl workbook containing configuration data
-        workbookName    - str, the name of the workbook/part of the solution
-        sheet           - str, the name of the sheet to be loaded
-        columns         - list(str), the list of columns required/to be loaded
-        isStrict        - boolean, True means concepts must be sequential (loaded as part of the data)
-        target          - data structure where the data is to be loaded
-    Returns
-        Nothing
-    '''
-
-    # Check for multi-sentence worksheet - must be column[1]
-    try:
-        colAt = columns.index('Sentences')
-        if colAt == 1:
-            isMulti = True
-        else:
-            isMulti = False
-    except ValueError:
-        isMulti = False
-
-    this_df = checkWorksheet(wb, workbook, sheet, columns, False)
-    thisData = this_df.values.tolist()
-    for record in thisData:
-        if record[0] is None:
-            break
-        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
-        solutionID, isNegated = checkConfigConcept(record[0])
-        if isMulti:
-            sentences = int(record[1])
-            asserted = record[2]
-        else:
-            asserted = record[1]
-        if not isinstance(asserted, bool):
-            logging.critical('Invalid value for Asserted (%s) in worksheet(%s) in workbook(%s) in solution folder "%s"', asserted, sheet, workbook, d.solution)
-            logging.shutdown()
-            sys.exit(d.EX_CONFIG)
-        d.knownConcepts.add(solutionID)
-        concepts = []
-        if isMulti:
-            j = 3
-        else:
-            j = 2
-        while (j < len(record)) and (record[j] is not None):
-            conceptID, thisNeg = checkConfigConcept(record[j])
-            concepts.append((conceptID, thisNeg))
-            d.knownConcepts.add(conceptID)
-            j += 1
-        if isMulti:
-            target.append((solutionID, concepts, isStrict, sentences, isNegated, asserted))
-        else:
-            target.append((solutionID, concepts, isStrict, 1, isNegated, asserted))
-    return
-
-
-def loadConceptSetsWorksheet(wb, workbook, sheet, columns, target):
-    '''
-    Load a worksheet into the target as a list of tuples
-    where the first tuple element is a Solution ID.
-    The second tuple element is a list of tuples, being pairs of MetaThesaurusIDs and a ternary value indicating
-    whether the MetaThesaurusID is asserted, negated or ambiguous.
-    This is the set of concepts being searched for in the clincial document.
-    The third tuple element is the maximum number of sentence within which this sequence must occur.
-    The fourth tuple element is a ternary value indicating whether the Solution ID is asserted, negated or ambiguous.
-    The fifth tuple element indicates wherter or not all the matched MetaThesaurusIDs should be deemed 'Used'
-    when the set if found and the Solution ID added to the document. That is, concepts found to match the set
-    are deemed 'Used' and cannot participate in any further set or matching operations.
-    e.g. (SolutionID, [(concept, isNeg)], sentences, isNeg, asserted)
-    Parameters
-        wb              - an openpyxl workbook containing configuration data
-        workbookName    - str, the name of the workbook/part of the solution
-        sheet           - str, the name of the sheet to be loaded
-        columns         - list(str), the list of columns required/to be loaded
-        isStrict        - boolean, True means concepts must be sequential (loaded as part of the data)
-        target          - data structure where the data is to be loaded
-    Returns
-        Nothing
-    '''
-
-    # Check for multi-sentence worksheet - must be column[1]
-    try:
-        colAt = columns.index('Sentences')
-        if colAt == 1:
-            isMulti = True
-        else:
-            isMulti = False
-    except ValueError:
-        isMulti = False
-
-    this_df = checkWorksheet(wb, workbook, sheet, columns, False)
-    thisData = this_df.values.tolist()
-    for record in thisData:
-        if record[0] is None:
-            break
-        # logging.debug("sheet(%s), columns(%s), record(%s)", sheet, columns, record)
-        solutionID, isNegated = checkConfigConcept(record[0])
-        if isMulti:
-            sentences = int(record[1])
-            asserted = record[2]
-        else:
-            asserted = record[1]
-        if not isinstance(asserted, bool):
-            logging.critical('Invalid value for Asserted (%s) in worksheet(%s) in workbook(%s) in solution folder "%s"', asserted, sheet, workbook, d.solution)
-            logging.shutdown()
-            sys.exit(d.EX_CONFIG)
-        d.knownConcepts.add(solutionID)
-        concepts = []
-        if isMulti:
-            j = 3
-        else:
-            j = 2
-        while (j < len(record)) and (record[j] is not None):
-            conceptID, thisNeg = checkConfigConcept(record[j])
-            concepts.append((conceptID, thisNeg))
-            d.knownConcepts.add(conceptID)
-            j += 1
-        if isMulti:
-            target.append((solutionID, concepts, sentences, isNegated, asserted))
-        else:
-            target.append((solutionID, concepts, 1, isNegated, asserted))
-    return
-
-
-def checkPreamble(inPreamble, text):
-    '''
-    Check for preamble markers in document as a whole.
-    If we are already in preamble, then check for an end of preamble marker.
-    If we are not in preamble, then check for a start of preamble marker.
-    Parameters
-        inPreamble - Boolean, True if the end of the last piece of text was preamble
-        text - the text to be tested
-    Returns 
-        changeFound - Boolean, True if the text contains a preamble marker in the middle of the text
-                      that indicates a change in preamble (inPreamble to not inPreamble or visa versa)
-        changeAt    - int, the location in the text where the preamble state changed
-    '''
-
-    # logging.debug('checking for preamble in document(%s)', text)
-    # Check if we are in preamble and ran into something useful, or in useful text, but ran in to preamble
-    if inPreamble:        # We are in preamble
-        # Check for the configured end of preamble markers (regular expression, ignore case)
-        documentFound = False
-        changeAt = None
-        # Search for the end 'start of preamble marker'
-        for marker, isStart in d.preambleMarkers:
-            # logging.debug('Checking marker:%s', marker.pattern)
-            if isStart:    # This is a start of preamble marker, but we are in preamble, so skip this marker
-                continue
-            match = marker.search(text)
-            if match is not None:        # End of preamble found
-                documentFound = True        # Some document text found
-                # Remember where we ended preamble
-                if (changeAt is None) or (match.start() < changeAt):
-                    changeAt = match.start()
-        if not documentFound:        # We are still in preamble, or at least we think we are - the specific solution may have a different answer
-            changeAt = d.sp.checkNotPreamble(text)
-            if changeAt >= 0:    # The specific solution found the end of preamble
-                documentFound = True
-        if documentFound:        # We did bounced out of preamble
-            return (True, changeAt)        # Preamble change found, at
-        else:        # We did not bounce out of preamble
-            return (False, 0)        # The rest was preamble
-    else:        # We are not in preamble
-        # Check for the configured start of preamble markers (regular expression, ignore case)
-        preambleFound = False
-        changeAt = None
-        # Search for the first occurance of a 'start of preamble marker' in this sentence
-        for marker, isStart in d.preambleMarkers:
-            # logging.debug('Checking marker:%s', marker[0].pattern)
-            if not isStart:    # This is an end of preamble marker, but we are not in preamble, so skip this marker
-                continue
-            match = marker.search(text)
-            if match is not None:    # Start of preamble marker found
-                preambleFound = True        # Start of preamble marker found
-                # Remember where we started preamble
-                if (changeAt is None) or (match.start() > changeAt):
-                    changeAt = match.start()
-        if not preambleFound:        # We aren't in preamble, or at least we don't think we are - the specific solution may have a different answer
-            changeAt = d.sp.checkPreamble(text)
-            if changeAt >= 0:    # The specific solution found the end of preamble
-                preambleFound = True
-        if preambleFound:                # We bounced into preamble
-            return (True, changeAt)        # Preamble change found, at
-        else:        # We did not bounce out of preamble
-            return (False, 0)        # No preamble in this document
-
-
-def checkHistory(inHistory, text, depth):
-    '''
-    Check for history markers in this text.
-    If we are already in history, then check for an end of history marker.
-    If we are not in history, then check for a start of history marker.
-    This function is called as d.sentences is being compiled/growing.
-    So 'text' will be in the last line added to d.sentences
-    Parameters
-        inHistory   - Boolean, True if the end of the last piece of text was history
-        text        - the text to be tested
-        depth       - the level of recursion
-    Returns 
-        changeAt    - int, the location in the text at which the state of history changed
-        matchLen    - int, the length of the matching text which triggered a  history change
-    '''
-
-    logging.debug('checkHistory() - checking for history in text(%s)', text)
-    # Check if we are in history and ran into something useful, or in useful text, but ran in to history
-    if inHistory:        # We are in history - check to see if we've come to the end of this history section
-        logging.debug('checkHistory() - checking for leaving history in text(%s)', text)
-        # Check for the configured end of history markers (regular expression, ignore case)
-        historyEndFound = False
-        newStart = None
-        matchLen = None
-        # Search for the first occurence of an 'end of history marker' in this text
-        for marker, isStart in d.historyMarkers:
-            if isStart:    # This is a start of history marker, but we are in history, so skip this marker
-                continue
-            logging.debug('checkHistory() - checking endOfHistory marker:%s[%s]', marker.pattern, marker.flags)
-            match = marker.search(text)
-            if match is not None:        # End of history found
-                historyEndFound = True        # Some document 'end of history' text found
-                # Remember where we ended history
-                if (newStart is None) or (match.start() < newStart):
-                    newStart = match.start()
-                    matchLen = len(match.group())
-        if historyEndFound:        # We did bounced out of history
-            logging.debug('checkHistory() - end of history found at %d with "%s"', newStart, text[newStart:newStart + matchLen])
-            return (newStart, matchLen)
-        # We are still in history, or at least we think we are - the specific solution may have a different answer
-        historyEnds, scChangeAt, scLen = d.sc.solutionCheckHistory(inHistory, text)
-        # The solution can indicate that history ended at a previous sentence
-        # All sentences between this new end of history and the current sentence are not history
-        if historyEnds == 0:        # History ends with this sentence
-            logging.debug('checkHistory() - solution say history ended at the start of this sentence')
-            return (scChangeAt, scLen)
-        elif historyEnds > 0:        # History ended with a previous sentence
-            # History ended several sentences ago - update those sentences to not history
-            # We need to reprocess these sentence as they were processed as though they were in history.
-            # However this is recursive, so check that we haven't fallen into a recursive loop
-            logging.debug('checkHistory() - solution says history ended %d sentences ago', historyEnds)
-            if depth > 2:
-                logging.critical('Too many levels of recursion when checking history')
-                logging.shutdown()
-                sys.exit(d.EX_CONFIG)
-            thisHistory = False
-            for fixIt in range(0, historyEnds):
-                d.sentences[-1 - fixIt][0] = False        # Has no history changes
-                d.sentences[-1 - fixIt][1] = False        # Starts with not history
-                d.sentences[-1 - fixIt][5] = []            # No history changes
-                txt = str(d.sentences[-1 - fixIt][4])
-                # We have to check if this sentence has a sentence history tag somewhere in the sentence
-                firstChange = True
-                lastChange = 0
-                changesAt, matchLen = checkHistory(thisHistory, txt, depth + 1)
-                while changesAt is not None:        # Bounced in or out of history mid sentence
-                    if firstChange and (changesAt == 0):            # Changed at the start of the text which is the start of the sentence
-                        d.sentences[-1 - fixIt][1] = not thisHistory
-                    elif len(d.sentences[-1 - fixIt][5]) == 0:    # Check for previous changes
-                        d.sentences[-1 - fixIt][5].append(changesAt)
-                        d.sentences[-1 - fixIt][0] = True    # Does contain history changes
-                    else:
-                        changesAt += d.sentences[-1 - fixIt][5][-1] + lastChange
-                        d.sentences[-1 - fixIt][5].append(changesAt)
-                        d.sentences[-1 - fixIt][0] = True    # Does contain history changes
-                    firstChange = False
-                    lastChange = matchLen
-                    thisHistory = not thisHistory
-                    txt = txt[changesAt + matchLen:]
-                    changesAt, matchLen = checkHistory(thisHistory, txt, depth + 1)
-            return (0, scLen)
-        else:
-            return (None, None)
-    else:        # We are not in history - check that we didn't fall into another history section
-        logging.debug('Checking for entering history in text(%s)', text)
-        # Check for the configured start of history markers (regular expression, ignore case)
-        historyFound = False
-        newStart = None
-        matchLen = None
-        # Search for the first occurance of a 'start of history marker' in this text
-        for marker, isStart in d.historyMarkers:
-            if not isStart:    # This is an end of history marker, but we are not in history, so skip this marker
-                continue
-            logging.debug('Checking inHistory marker:%s[%s]', marker.pattern, marker.flags)
-            match = marker.search(text)
-            if match is not None:    # Start of history found
-                historyFound = True        # Start of history marker found
-                # Remember where we started history
-                if (newStart is None) or (match.start() < newStart):
-                    newStart = match.start()
-                    matchLen = len(match.group())
-        if historyFound:        # We did bounce into history
-            logging.debug('checkHistory() - history found at %d with text "%s"', newStart, text[newStart:newStart + matchLen])
-            return (newStart, matchLen)
-        # We aren't in history, or at least we don't think we are - the specific solution may have a different answer
-        historyAt, scChangeAt, scLen = d.sc.solutionCheckHistory(inHistory, text)
-        # The solution can indicate that history started at a previous sentence
-        # All sentences between this new start of history and the current sentence are history
-        if historyAt == 0:            # History starts with this sentence
-            logging.debug('checkHistory() - solution say history started at the start of this sentence')
-            return (scChangeAt, scLen)
-        elif historyAt > 0:            # History starts at a previous sentence
-            # History started several sentences ago - update those sentences to history
-            # We need to reprocess these sentence as they were processed as though they were not in history.
-            # However this is recursive, so check that we haven't fallen into a recursive loop
-            if depth > 2:
-                logging.critical('Too many levels of recursion when checking history')
-                logging.shutdown()
-                sys.exit(d.EX_CONFIG)
-            logging.debug('checkHistory() - solution says history started %d sentences ago', historyEnds)
-            thisHistory = True
-            for fixIt in range(0, historyAt):
-                d.sentences[-1 - fixIt][0] = False        # Has no history changes
-                d.sentences[-1 - fixIt][1] = True        # Starts with history
-                d.sentences[-1 - fixIt][5] = []            # No history changes
-                txt = str(d.sentences[-1 - fixIt][4])
-                # We have to check if this sentence has a sentence history tag somewhere in the sentence
-                firstChange = True
-                lastChange = 0
-                changesAt, matchLen = checkHistory(thisHistory, txt, depth + 1)
-                while changesAt is not None:        # Bounced in or out of history mid sentence
-                    if firstChange and (changesAt == 0):            # Changed at the start of the text which is the start of the sentence
-                        d.sentences[-1 - fixIt][1] = not thisHistory
-                    elif len(d.sentences[-1 - fixIt][5]) == 0:    # Check for previous changes
-                        d.sentences[-1 - fixIt][5].append(changesAt)
-                        d.sentences[-1 - fixIt][0] = True    # Does contain history somewhere
-                    else:
-                        changesAt += d.sentences[-1 - fixIt][5][-1] + lastChange
-                        d.sentences[-1 - fixIt][5].append(changesAt)
-                        d.sentences[-1 - fixIt][0] = True    # Does contain history somewhere
-                    firstChange = False
-                    lastChange = matchLen
-                    thisHistory = not thisHistory
-                    txt = txt[changesAt + matchLen:]
-                    changesAt, matchLen = checkHistory(thisHistory, txt, depth + 1)
-            return (0, scLen)
-        else:
-            # We didn't run into history. Check if we have a pre-history sentence tag in the sentence
-            startHistory = None
-            matchLen = None
-            for prehistory in d.preHistory:
-                match = prehistory.search(text)
-                if match is not None:
-                    if (startHistory is None) or (match.start() < startHistory):
-                        # Remember where we entered history
-                        startHistory = match.start()
-                        matchLen = len(match.group())
-            if startHistory is not None:
-                logging.debug('checkHistory() - found a pre-history tag at %d', startHistory)
-                return (startHistory, matchLen)
-        return (None, None)
-
-
-def checkNegation(concept, text, start, sentenceNo, isNeg):
-    '''
-    Check if this concept needs to be negated
-    concept (which was triggered by 'text'), is at (start) in the document,
-    which is in sentence(sentenceNo). It may already be negated(isNeg)
-    Parameters
-        concept     - str, the SolutionID
-        text        - str, the text that has been coded to this SolutionID
-        start       - int, the start of this text in this document
-        sentenceNo  - int, the sentence in d.sentences where this text/concept was found
-        isNeg       - boolean, True if concept is a negated concept
-    Returns
-        changeIt    - str, single character indication whether the negation of concept needs to be changed
-                        '0' == "don't change", '1' == 'negate', '2' == 'make ambiguous'
-        reason      - str, the regular expression pattern that triggered the change
-        prePost     - str, the name of the name of the data set of patterns containing reason
-    '''
-
-    logging.debug('looking for negation of %s[%s] in %s', text, isNeg, d.sentences[sentenceNo][4])
-    changeIt = '0'
-    changeAt = -1
-    reason = ''
-    prePost = ''
-
-    # Find the start of this trigger in this sentence
-    thisStart = start - d.sentences[sentenceNo][2]      # Start in document minus start of this sentence
-
-    # Find the nearest, preceding and following but boundaries, if any
-    butBefore = None
-    butAfter = None
-    for butBoundary in d.butBoundaries:
-        logging.debug('looking for butBoundary (%s)', butBoundary.pattern)
-        match = butBoundary.search(d.sentences[sentenceNo][4])
-        if match is not None:
-            if match.start() < thisStart:
-                if (butBefore is None) or (butBefore < match.start()):
-                    butBefore = match.start()
-            elif match.start() > thisStart:
-                if (butAfter is None) or (butAfter > match.start()):
-                    butAfter = match.start()
-                logging.debug('found butBoundary (%s) at %d', butBoundary, match.start())
-    # Truncate the sentence text if there are any but boundaries
-    if butBefore is None:
-        if butAfter is None:
-            thisText = d.sentences[sentenceNo][4]
-        else:
-            thisText = d.sentences[sentenceNo][4][:butAfter]
-    else:
-        thisStart -= butBefore
-        if butAfter is None:
-            thisText = d.sentences[sentenceNo][4][butBefore:]
-        else:
-            thisText = d.sentences[sentenceNo][4][butBefore:butAfter]
-
-    # Find the start of the text for "post" things
-    thisEnd = thisStart + len(text)
-
-    # Find the nearest negation before this concept
-    if isNeg != '1':        # Don't look for negation of already negated
-        # Check for pre-negations
-        for preNegate in d.preNegation:
-            if (len(preNegate) > 1) and (concept not in preNegate[1:]):        # Check if this negation is limited to a list of concepts
-                continue
-            logging.debug('looking for preNegation of (%s) in (%s)', preNegate[0].pattern, thisText[:thisStart])
-            for match in preNegate[0].finditer(thisText[:thisStart]):
-                if match.start() > changeAt:
-                    changeAt = match.start()
-                    changeIt = '1'
-                    reason = preNegate[0].pattern
-                    prePost = 'preNegation'
-                    logging.debug('found preNegation(%s) at %d', reason, changeAt)
-        for immedPreNegate in d.immediatePreNegation:
-            if (len(immedPreNegate) > 1) and (concept not in immedPreNegate[1:]):        # Check if this negation is limited to a list of concepts
-                continue
-            logging.debug('looking for immediatePreNegation of (%s) in (%s)', immedPreNegate[0].pattern, thisText[:thisStart])
-            for match in immedPreNegate[0].finditer(thisText[:thisStart]):
-                if match.start() > changeAt:
-                    changeAt = match.start()
-                    changeIt = '1'
-                    reason = immedPreNegate[0].pattern
-                    prePost = 'immediatePreNegation'
-                    logging.debug('found immediatePreNegation (%s) at %d', reason, changeAt)
-    for immedPreAmbig in d.immediatePreAmbiguous:
-        if (len(immedPreAmbig) > 1) and (concept not in immedPreAmbig[1:]):        # Check if this ambiguity is limited to a list of concepts
-            continue
-        logging.debug('looking for immediate preAmbiguous of (%s) in (%s)', immedPreAmbig[0].pattern, thisText[:thisStart + len(text)])
-        for match in immedPreAmbig[0].finditer(thisText[:thisStart]):
-            if match.start() > changeAt:
-                changeAt = match.start()
-                changeIt = '2'
-                reason = immedPreAmbig[0].pattern
-                prePost = 'immediatePreAmbiguous'
-                logging.debug('found immediatePreAmbiguous(%s) at %d', reason, changeAt)
-    for preAmbig in d.preAmbiguous:
-        if (len(preAmbig) > 1) and (concept not in preAmbig[1:]):        # Check if this ambiguity is limited to a list of concepts
-            continue
-        logging.debug('looking for preAmbiguous of (%s) in (%s)', preAmbig[0].pattern, thisText[:thisStart + len(text)])
-        for match in preAmbig[0].finditer(thisText[:thisStart]):
-            if match.start() > changeAt:
-                changeAt = match.start()
-                changeIt = '2'
-                reason = preAmbig[0].pattern
-                prePost = 'preAmbiguous'
-                logging.debug('found preAmbiguous(%s) at %d', reason, changeAt)
-    if changeIt == '0':
-        # No preNegate or preAmbiguous, so try postNegate and postAmbiguous
-        changeAt = len(d.sentences[sentenceNo][4]) + 1
-        for postAmbig, exceptAmbig in d.postAmbiguous:
-            logging.debug('looking for postAmbigous of (%s) in (%s)', postAmbig.pattern, thisText[thisStart:])
-            for match in postAmbig.finditer(thisText[thisEnd:]):
-                if exceptAmbig is not None:
-                    exceptMatch = exceptAmbig.search(thisText[thisEnd:])
-                    if exceptMatch is not None:
-                        continue
-                if match.start() < changeAt:
-                    changeAt = match.start()
-                    changeIt = '2'
-                    reason = postAmbig.pattern
-                    prePost = 'postAmbiguous'
-                    logging.debug('found postAmbigous(%s) at %d', postAmbig[0].pattern, changeAt)
-        for immedPostAmbig, exceptAmbig in d.immediatePostAmbiguous:
-            logging.debug('looking for immediate postAmbigous of (%s) in (%s)', immedPostAmbig.pattern, thisText[thisStart:])
-            for match in immedPostAmbig.finditer(thisText[thisEnd:]):
-                if exceptAmbig is not None:
-                    exceptMatch = immedPostAmbig[1].search(thisText[thisEnd:])
-                    if exceptMatch is not None:
-                        continue
-                if match.start() < changeAt:
-                    changeAt = match.start()
-                    changeIt = '2'
-                    reason = immedPostAmbig.pattern
-                    prePost = 'immediatePostAmbiguous'
-                    logging.debug('found immediatePostAmbigous(%s) at %d', immedPostAmbig[0].pattern, changeAt)
-        if isNeg != '1':        # Don't look for negation of already negated
-            for postNegate, exceptNegate in d.postNegation:
-                logging.debug('looking for postNegation of (%s) in (%s)', postNegate.pattern, thisText[thisStart:])
-                for match in postNegate.finditer(thisText[thisEnd:]):
-                    if exceptNegate is not None:
-                        exceptMatch = exceptNegate.search(thisText[thisEnd:])
-                        if exceptMatch is not None:
-                            continue
-                    if match.start() < changeAt:
-                        changeAt = match.start()
-                        changeIt = '1'
-                        reason = postNegate[0].pattern
-                        prePost = 'postNegation'
-                        logging.debug('found postNegation(%s) at %d', postNegate[0].pattern, changeAt)
-            for immedPostNegate, exceptNegate in d.immediatePostNegation:
-                logging.debug('looking for immediatePostNegation of (%s) in (%s)', immedPostNegate.pattern, thisText[thisStart:])
-                for match in immedPostNegate.finditer(thisText[thisEnd:]):
-                    if exceptNegate is not None:
-                        exceptMatch = exceptNegate.search(thisText[thisEnd:])
-                        if exceptMatch is not None:
-                            continue
-                    if match.start() < changeAt:
-                        changeAt = match.start()
-                        changeIt = '1'
-                        reason = immedPostNegate[0].pattern
-                        prePost = 'immediatePostNegation'
-                        logging.debug('found immediatePostNegation (%s) at %d', immedPostNegate[0].pattern, changeAt)
-    return (changeIt, reason, prePost)
-
-
-def checkModified(concept, isNeg, sentenceNo, start, miniDoc):
-    '''
-    Check if this concept has a modified definition,
-    either because of an immediately preceding preModifier or because of an immediately following postModifier
-    and if it does, then modify it.
-    Parameters
-        concept     - str, SolutionID which may need modification
-        isNeg       - str, one character indicating negation/ambiguity
-        sentenceNo  - int, the sentence in d.sentences where this concept was found
-        start       - int, the location of the text in this sentence which was coded to this concept
-    Returns
-        nothing
-    '''
-
-    document = d.sentences[sentenceNo][6]        # Sentences hold mini-documents
-    # Check concept, oldNeg, newConcept, newNeg, pattern
-    if concept in d.preModifiers:
-        thisNeg, newConcept, newNeg, modifier = d.preModifiers[concept]
-        if isNeg != thisNeg:            # And matching negation (ignore ambiguity)
-            if (isNeg not in [2, 3]) or (thisNeg not in [2, 3]):
-                return
-        # Phrases preceding this concept that change the semantic meaning of this concept
-        # this.logger.debug('looking for preModifier of (%s) in (%s)', str(preModier[4].pattern), str(preText))
-        preText = d.sentences[sentenceNo][4][:start]    # The text before this concept text in the sentence
-        match = modifier.search(preText)
-        if match is not None:
-            logging.info('Changing concept from (%s[%s]) to (%s[%s])', concept, isNeg, newConcept, newNeg)
-            if newConcept in d.solutionMetaThesaurus:
-                document[start][miniDoc]['description'] = d.solutionMetaThesaurus[newConcept]['description'] + '(was:' + concept + ')'
-            else:
-                document[start][miniDoc]['description'] = 'unknown (was:' + concept + ' - ' + document[start][miniDoc]['description'] + ')'
-            document[start][miniDoc]['concept'] = newConcept
-            document[start][miniDoc]['negation'] = newNeg
-    # Check concept, oldNeg, newConcept, newNeg, pattern
-    if concept in d.postModifiers:
-        thisNeg, newConcept, newNeg, modifier = d.postModifiers[concept]
-        if isNeg != thisNeg:            # And matching negation (ignore ambiguity)
-            if (isNeg not in ['2', '3']) or (thisNeg not in ['2', '3']):
-                return
-        # Phrases that follow this concept and change the semantic meaning of this concept
-        # this.logger.debug('looking for postModifier of (%s) in (%s)', str(postModier[4].pattern), str(preText))
-        conceptEnd = start + document[start][miniDoc]['length']            # The end of this concept text in the sentence
-        postText = d.sentences[sentenceNo][4][conceptEnd:]    # The text after this concept text in the sentence
-        match = modifier.search(postText)
-        if match is not None:
-            logging.info('Changing concept from (%s[%s]) to (%s[%s])', concept, isNeg, newConcept, newNeg)
-            if newConcept in d.solutionMetaThesaurus:
-                document[start][miniDoc]['description'] = d.solutionMetaThesaurus[newConcept]['description'] + '(was:' + concept + ')'
-            else:
-                document[start][miniDoc]['description'] = 'unknown (was:' + concept + ' - ' + document[start][miniDoc]['description'] + ')'
-            document[start][miniDoc]['concept'] = newConcept
-            document[start][miniDoc]['negation'] = newNeg
-    return
-
-
-def checkSets(history):
-    '''
-    Work through each of the 'sets' concepts and see if we can find matches for each 'set'
-    We do sentence sets before document sets, and sequential sets before non-sequential sets.
-    Parameters
-        history - boolean, True if we are checking in historical text
-    Returns
-        Nothing
-    '''
-
-    # Check if any of the sentences contains any of the the Sentence (Strict) Sequence Concept Sets
-    # We test sentence sequence sets first because they are a stricter test.
-    # Sentence sequence sets are checked in the order in which they are appended to the sentenceConceptSequenceSets array
-    # which is 'sent_strict_seq_concepts_set', 'sentence_sequence_concept_sets', 'multi_sent_strict_seq_conc_sets' then 'multi_sentence_seq_concept_sets'
-    # [solutionID, [[concept, negation]], isStrict, sentenceRange, isNeg, asserted]
-
-    # check each sentence concept sequence set
-    for setNo, (higherConcept, thisSet, isStrict, sentenceRange, higherConceptNegated, asserted) in enumerate(d.sentenceConceptSequenceSets):
-        logging.debug('Checking sentence Concept Sequence set (%s) [%s]', d.sentenceConceptSequenceSets[setNo], history)
-        if len(thisSet) == 0:       # Empty concept list
-            continue
-        conceptNo = 0           # The index of the next concept in the sequence set
-        conceptList = []        # The concepts in this set that have been found
-        concept, isNeg = thisSet[conceptNo]     # The next concept that we are looking for
-        firstConcept, firstIsNeg = thisSet[0]
-        for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
-            logging.debug('checkSets - sentence Concept (Strict) (Sequence) Sets - processing sentence[%d]', sentenceNo)
-            document = sentence[6]        # Sentences hold mini-documents
-            if len(conceptList) == 0:        # Compute a new 'valid range' if still looking for the first concept
-                # Compute the last sentence for this range
-                lastSentence = sentenceNo + sentenceRange - 1
-                if lastSentence >= len(d.sentences):
-                    lastSentence = len(d.sentences) - 1
-                # Compute the character position of the end of the last sentence in this range
-                sentenceEnd = d.sentences[lastSentence][2] + d.sentences[lastSentence][3]
-            for thisStart in sorted(document, key=int):        # We step through all concepts in each sentence
-                conceptFound = False                    # Concept in theSet at 'conceptNo' not yet found at thisStart
-                for jj, miniDoc in enumerate(document[thisStart]):    # Step through the list of alternate concepts at this point in this sentence
-                    # Only check history if we are looking for history, and non-history if we are looking for non-history
-                    if miniDoc['history'] != history:
-                        break
-                    if miniDoc['used']:        # Skip used concepts
-                        continue
-                    # Ignore any concept who's text extends beyond this sentence range
-                    if thisStart + miniDoc['length'] > sentenceEnd:
-                        continue
-                    thisConcept = miniDoc['concept']        # This concept
-                    thisIsNeg = miniDoc['negation']        # And it's negation
-                    # Only check concepts that we know something about - the appeared in one of our configuration files
-                    if thisConcept not in d.knownConcepts:
-                        continue
-                    # Check if this alternate concept, at 'start', is in the next concept in this sentence concept sequence set
-                    found = False
-                    if concept == thisConcept:
-                        if isNeg == thisIsNeg:
-                            found = True
-                            break
-                        elif (isNeg in ['2', '3']) and (thisIsNeg in ['2', '3']):
-                            found = True
-                            break
-                    if not found:
-                        # Check for a restart of the sequence,
-                        # We special case of a repetition of the first concept in the set
-                        # We don't handle repetitions within a set - just a repetition of the first concept
-                        # i.e.looking for concept 'n' - found concept 0 [this set, array of concepts in dict, first entry, concept]
-                        if (thisConcept == firstConcept) and ((firstIsNeg == thisIsNeg) or (firstIsNeg in ['2', '3']) and (thisIsNeg in ['2', '3'])):
-                            # Found the first concept - restart the multi-sentence counter
-                            # Compute the last sentence for this range
-                            lastSentence = sentenceNo + sentenceRange - 1
-                            if lastSentence >= len(d.sentences):
-                                lastSentence = len(d.sentences) - 1
-                            # Compute the character position of the end of the last sentence in this range
-                            sentenceEnd = d.sentences[lastSentence][2] + d.sentences[lastSentence][3]
-                            conceptList = []
-                            conceptList.append((sentenceNo, thisStart, jj))        # Add to the list of things we may need to mark as 'used'
-                            conceptNo = 1
-                            conceptFound = True
-                            logging.debug('concept(%s[%s]) is not the next concept (%s[%s]) in set[%d], but is the first - restarting',
-                                            thisConcept, thisIsNeg, concept, isNeg, setNo)
-                            break   # Proceed to next 'start' in this sentence
-                        continue
-                    # We have the next concept from this set
-                    conceptFound = True
-                    conceptList.append((sentenceNo, thisStart, jj))        # Add to the list of things we may need to mark as 'used'
-                    logging.debug('Concept (%s) [for sentence Concept (Strict) (Sequence) set:%d] found', thisConcept, setNo)
-                    conceptNo += 1
-                    if len(conceptList) == len(thisSet):
-                        # We have a full concept (strict) (sequence) set - so save the higher concept - append the higher concept to the list of alternates
-                        logging.info('Sentence concept sequence set (%s:%s) found', higherConcept, thisSet)
-                        addAdditionalConcept(higherConcept, sentenceNo, thisStart, jj, None, higherConceptNegated,
-                                            f'sentenceConceptSequenceSet:{repr(thisSet)}', 0)
-
-                        # Check if we should mark all/some of the concepts in the concept list as used
-                        if asserted or (d.sc.higherConceptFound(higherConcept)):
-                            for sno, strt, k in conceptList:
-                                foundConcept = d.sentences[sno][6][strt][k]['concept']
-                                # Check if we should mark this concepts in the concept list as used
-                                if asserted or (d.sc.setConcept(higherConcept, foundConcept)):
-                                    d.sentences[sno][6][strt][k]['used'] = True
-                                    logging.debug('Marking sentence concept sequence set item at %d/%d as used', strt, k)
-
-                        conceptNo = 0        # Restart in case the same concept sequence set exists later in the sentences
-                        conceptList = []
-                        # Compute the last sentence for this range
-                        lastSentence = sentenceNo + sentenceRange - 1
-                        if lastSentence >= len(d.sentences):
-                            lastSentence = len(d.sentences) - 1
-                        # Compute the character position of the end of the last sentence in this range
-                        sentenceEnd = d.sentences[lastSentence][2] + d.sentences[lastSentence][3]
-                        break   # Proceed to next 'start' in this sentence
-                    else:
-                        conceptNo += 1
-                # end of all the alternate concepts at this point in the sentence
-                # If this is a strict list - and we are part way through matching the concepts, then start again
-                if isStrict and (conceptNo > 0) and not conceptFound:    # Tried all alternatives and the next concept in the strict list was not found
-                    logging.info('Strict sequence started[%d] abandoned due to mismatch', setNo)
-                    conceptNo = 0        # Restart in case the set exists later in the sentences
-                    conceptList = []
-                    # Compute the last sentence for this range
-                    lastSentence = sentenceNo + sentenceRange - 1
-                    if lastSentence >= len(d.sentences):
-                        lastSentence = len(d.sentences) - 1
-                    sentenceEnd = d.sentences[lastSentence][2] + d.sentences[lastSentence][3]
-            # end of all the concepts in this sentence
-            # If we are part way through matching the concepts, but this is the last sentence in the current range then start again
-            if (conceptNo > 0) and (sentenceNo == lastSentence):
-                conceptNo = 0
-                conceptList = []
-        # end of the sentences
-    # end of sentence concept sequence set
-
-
-    # Next check the Sentence Concept Sets
-    # We test these next because Sentence Concept Sets may create concepts that become part of a document sequence or document concept set
-    # Sentence Concept Sets can be valid over a number of sentences, but we may have to expire things found if we go beyond that range
-    # (SolutionID, [(concept, isNeg)], sentences, isNeg, asserted)
-    for setNo, (higherConcept, thisSet, sentenceRange, higherConceptNegated, asserted) in enumerate(d.sentenceConceptSets):
-        logging.debug('Checking sentence Concept set (%s) [%s]', d.sentenceConceptSets[setNo], history)
-        if len(thisSet) == 0:       # Empty concept list
-            continue
-        toFindCount = {}        # The count of the number of times each concept/negation occurs in this set
-        for concept, isNeg in thisSet:
-            if (concept, isNeg) not in toFindCount:
-                toFindCount[(concept, isNeg)] = 1
-            else:
-                toFindCount[(concept, isNeg)] += 1
-        conceptList = []        # The concepts in this set that have been found
-        for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
-            logging.debug('checkSets - sentence Concept Sets - processing sentence[%d]', sentenceNo)
-            document = sentence[6]        # Sentences hold mini-documents
-            if len(conceptList) == 0:        # Compute a new 'valid range' if still looking for the first concept
-                # Compute the last sentence for this range
-                lastSentence = sentenceNo + sentenceRange - 1
-                if lastSentence >= len(d.sentences):
-                    lastSentence = len(d.sentences) - 1
-                # Compute the character position of the end of the last sentence in this range
-                sentenceEnd = d.sentences[lastSentence][2] + d.sentences[lastSentence][3]
-
-            for thisStart in sorted(document, key=int):        # We step through all concepts in each sentence
-                for jj, miniDoc in enumerate(document[thisStart]):    # Step through the list of alternate concepts at this point in this sentence
-                    # Only check history if we are looking for history, and non-history if we are looking for non-history
-                    if miniDoc['history'] != history:
-                        break
-                    if miniDoc['used']:        # Skip used concepts
-                        continue
-                    # Ignore any concept who's text extends beyond this sentence range
-                    if thisStart + miniDoc['length'] > sentenceEnd:
-                        continue
-                    thisConcept = miniDoc['concept']        # This concept
-                    thisIsNeg = miniDoc['negation']        # And it's negation
-                    # Only check concepts that we know something about - the appeared in one of our configuration files
-                    if thisConcept not in d.knownConcepts:
-                        continue
-                    # Check if this alternate concept, at 'start', is in this sentence concept set
-                    if (thisConcept, thisIsNeg) not in toFindCount:
-                        continue
-                    if toFindCount[(thisConcept, thisIsNeg)] == 0:      # All required instances already found
-                        continue
-                    toFindCount[(thisConcept, thisIsNeg)] -= 1
-                    conceptList.append((sentenceNo, thisStart, jj))        # Add to the list of things we may need to mark as 'used'
-                    logging.debug('Concept (%s) [for sentence Concept set:%d] found', thisConcept, setNo)
-                    if len(conceptList) == len(thisSet):
-                        # We have a full concept set - so save the higher concept - append the higher concept to the list of alternates
-                        logging.info('Sentence concept set (%s:%s) found', higherConcept, thisSet)
-                        addAdditionalConcept(higherConcept, sentenceNo, thisStart, jj, None, higherConceptNegated,
-                                            f'sentenceConceptSequenceSet:{repr(thisSet)}', 0)
-
-                        # Check if we should mark all/some of the concepts in the concept list as used
-                        if (asserted) or (d.sc.higherConceptFound(higherConcept)):
-                            for sno, strt, k in conceptList:
-                                foundConcept = d.sentences[sno][6][strt][k]['concept']
-                                # Check if we should mark this concepts in the concept list as used
-                                if asserted or (d.sc.setConcept(higherConcept, foundConcept)):
-                                    d.sentences[sno][6][strt][k]['used'] = True
-                                    logging.debug('Marking sentence concept sequence set item at %d/%d as used', strt, k)
-
-                        # Restart in case the same concept sequence set exists later in the sentences
-                        toFindCount = {}        # The count of the number of times each concept/negation occurs in this set
-                        for concept, isNeg in thisSet:
-                            if (concept, isNeg) not in toFindCount:
-                                toFindCount[(concept, isNeg)] = 1
-                            else:
-                                toFindCount[(concept, isNeg)] += 1
-                        conceptList = []        # The concepts in this set that have been found
-                        # Compute the last sentence for this range
-                        lastSentence = sentenceNo + sentenceRange - 1
-                        if lastSentence >= len(d.sentences):
-                            lastSentence = len(d.sentences) - 1
-                        # Compute the character position of the end of the last sentence in this range
-                        sentenceEnd = d.sentences[lastSentence][2] + d.sentences[lastSentence][3]
-                        break   # Proceed to next 'start' in this sentence
-                # end of all the alternate concepts at this point in the sentence
-            # end of all the concepts in this sentence
-        # end of the sentences
-    # end of sentence concept sequence set
-
-    # Next check for any document Concept Sequence Sets - checking across all sentences
-    # We test sequence sets first because they are a stricter test
-    # and because Document Sequence Sets may create concepts that become part of a document concept set
-    # [solutionID, [[concept, isNeg]], isNeg, asserted])
-
-    # check each document concept sequence set
-    for setNo, (higherConcept, thisSet, sentenceRange, higherConceptNegated, asserted) in enumerate(d.documentConceptSequenceSets):
-        # sentenceRange will be '1' and should be ignored, as this is a whole of document check
-        logging.debug('Checking document concept sequence set (%s)', d.documentConceptSequenceSets[setNo])
-        conceptNo = 0                # Check each concept in the set in sequence
-        conceptList = []            # And remember which one's we've found so we can mark them as used if we get a full set
-        concept, isNeg = thisSet[conceptNo]     # The next concept that we are looking for
-        firstConcept, firstIsNeg = thisSet[0]
-        for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
-            logging.debug('checkSets - document Concept Sequence Sets - processing sentence[%d]', sentenceNo)
-            document = sentence[6]    # Sentences hold mini-documents
-            for thisStart in sorted(document, key=int):
-                conceptFound = False                    # Concept in theSet at 'conceptNo' not yet found at thisStart
-                for jj, miniDoc in enumerate(document[thisStart]):
-                    # Only check history if we are looking for history, and non-history if we are looking for non-history
-                    if miniDoc['history'] != history:
-                        break
-                    thisConcept =  miniDoc['concept']
-                    thisIsNeg =  miniDoc['negation']        # Check negation matches
-                    if miniDoc['used']:        # Skip used concepts [only Findings get 'used']
-                        continue
-                    # Only check concepts that we know something about - the appeared in one of our configuration files
-                    if thisConcept not in d.knownConcepts:
-                        continue
-                    # Check if this is the next one in the sequence
-                    found = False
-                    thisNeg = thisSet[conceptNo][1]
-                    if thisConcept == thisSet[conceptNo][0]:
-                        if thisIsNeg == thisNeg:
-                            found = True
-                        elif (thisIsNeg in ['2', '3']) and (thisNeg in ['2', '3']):
-                            found = True
-                    if not found:
-                        # Check for a restart of the sequence,
-                        # We special case of a repetition of the first concept in the set
-                        # We don't handle repetitions within a set - just a repetition of the first concept
-                        # i.e.looking for concept 'n' - found concept 0 [this set, array of concepts in dict, first entry, concept]
-                        if (thisConcept == firstConcept) and ((firstIsNeg == thisIsNeg) or (firstIsNeg in ['2', '3']) and (thisIsNeg in ['2', '3'])):
-                            # Found the first concept - restart the multi-sentence counter
-                            # Compute the last sentence for this range
-                            lastSentence = sentenceNo + sentenceRange - 1
-                            if lastSentence >= len(d.sentences):
-                                lastSentence = len(d.sentences) - 1
-                            # Compute the character position of the end of the last sentence in this range
-                            sentenceEnd = d.sentences[lastSentence][2] + d.sentences[lastSentence][3]
-                            conceptList = []
-                            conceptList.append((sentenceNo, thisStart, jj))        # Add to the list of things we may need to mark as 'used'
-                            conceptNo = 1
-                            conceptFound = True
-                            logging.debug('concept(%s[%s]) is not the next concept (%s[%s]) in set[%d], but is the first - restarting',
-                                            thisConcept, thisIsNeg, concept, isNeg, setNo)
-                            break   # Proceed to next 'start' in this sentence
-                        continue
-                    # We have the next concept from this set
-                    conceptFound = True
-                    conceptList.append((sentenceNo, thisStart, jj))        # Add to the list of things we may need to mark as 'used'
-                    logging.debug('Concept (%s) [for document Concept Sequence set:%d] found', thisConcept, setNo)
-                    if conceptNo == len(thisSet):
-                        # We have a full set - so save the higher concept
-                        logging.info('Document concept Sequence set (%s:%s) found', higherConcept, thisSet)
-                        addAdditionalConcept(higherConcept, sentenceNo, thisStart, jj, None, higherConceptNegated,
-                                             f'documentConceptSequenceSet:{repr(thisSet)}', 0)
-
-                        # Check if we should mark all/some of the concepts in the concept list as used
-                        if asserted or (d.sc.higherConceptFound(higherConcept)):
-                            for item, thisList in enumerate(conceptList):
-                                sno = thisList[0]
-                                strt = thisList[1]
-                                k = thisList[2]
-                                foundConcept = d.sentences[sno][6][strt][k]['concept']
-                                # Check if we should mark this concepts in the concept list as used
-                                if asserted or (d.sc.setConcept(higherConcept, foundConcept)):
-                                    d.sentences[sno][6][strt][k]['used'] = True
-                                logging.debug('Marking document concept Sequence set item at %d/%d as used', strt, k)
-                        conceptNo = 0        # Restart in case the same concept sequence set exists later in the sentences
-                        conceptList = []
-                        # Compute the last sentence for this range
-                        lastSentence = sentenceNo + sentenceRange - 1
-                        if lastSentence >= len(d.sentences):
-                            lastSentence = len(d.sentences) - 1
-                        # Compute the character position of the end of the last sentence in this range
-                        sentenceEnd = d.sentences[lastSentence][2] + d.sentences[lastSentence][3]
-                        break   # Proceed to next 'start' in this sentence
-                    # end of list of things to check
-                # end of all the alternate concepts at this point in the sentence
-            # end of all the concepts in this sentence
-        # end of all this sentences
-    # end of the document concept sequence set
-
-
-    # Now check for any Document Concept Sets - checking across all sentences
-    for setNo, (higherConcept, thisSet, sentenceRange, higherConceptNegated, asserted) in enumerate(d.documentConceptSets):
-        # sentenceRange will be '1' and should be ignored, as this is a whole of document check
-        logging.debug('Checking document Concept set (%s) [%s]', d.documentConceptSets[setNo], history)
-        if len(thisSet) == 0:       # Empty concept list
-            continue
-        toFindCount = {}        # The count of the number of times each concept/negation occurs in this set
-        for concept, isNeg in thisSet:
-            if (concept, isNeg) not in toFindCount:
-                toFindCount[(concept, isNeg)] = 1
-            else:
-                toFindCount[(concept, isNeg)] += 1
-        conceptList = []        # The concepts in this set that have been found
-        for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
-            logging.debug('checkSets - document Concept Sets - processing sentence[%d]', sentenceNo)
-            document = sentence[6]        # Sentences hold mini-documents
-            for thisStart in sorted(document, key=int):        # We step through all concepts in each sentence
-                for jj, miniDoc in enumerate(document[thisStart]):    # Step through the list of alternate concepts at this point in this sentence
-                    # Only check history if we are looking for history, and non-history if we are looking for non-history
-                    if miniDoc['history'] != history:
-                        break
-                    if miniDoc['used']:        # Skip used concepts
-                        continue
-                    # Ignore any concept who's text extends beyond this sentence range
-                    if thisStart + miniDoc['length'] > sentenceEnd:
-                        continue
-                    thisConcept = miniDoc['concept']        # This concept
-                    thisIsNeg = miniDoc['negation']        # And it's negation
-                    # Only check concepts that we know something about - the appeared in one of our configuration files
-                    if thisConcept not in d.knownConcepts:
-                        continue
-                    # Check if this alternate concept, at 'start', is in this sentence concept set
-                    if (thisConcept, thisIsNeg) not in toFindCount:
-                        continue
-                    if toFindCount[(thisConcept, thisIsNeg)] == 0:      # All required instances already found
-                        continue
-                    toFindCount[(thisConcept, thisIsNeg)] -= 1
-                    conceptList.append((sentenceNo, thisStart, jj))        # Add to the list of things we may need to mark as 'used'
-                    logging.debug('Concept (%s) [for document Concept set:%d] found', thisConcept, setNo)
-                    if len(conceptList) == len(thisSet):
-                        # We have a full concept set - so save the higher concept - append the higher concept to the list of alternates
-                        logging.info('Sentence concept set (%s:%s) found', higherConcept, thisSet)
-                        addAdditionalConcept(higherConcept, sentenceNo, thisStart, jj, None, higherConceptNegated,
-                                            f'sentenceConceptSequenceSet:{repr(thisSet)}', 0)
-
-                        # Check if we should mark all/some of the concepts in the concept list as used
-                        if (asserted) or (d.sc.higherConceptFound(higherConcept)):
-                            for sno, strt, k in conceptList:
-                                foundConcept = d.sentences[sno][6][strt][k]['concept']
-                                # Check if we should mark this concepts in the concept list as used
-                                if asserted or (d.sc.setConcept(higherConcept, foundConcept)):
-                                    d.sentences[sno][6][strt][k]['used'] = True
-                                    logging.debug('Marking sentence concept sequence set item at %d/%d as used', strt, k)
-
-                        # Restart in case the same concept sequence set exists later in the sentences
-                        toFindCount = {}        # The count of the number of times each concept/negation occurs in this set
-                        for concept, isNeg in thisSet:
-                            if (concept, isNeg) not in toFindCount:
-                                toFindCount[(concept, isNeg)] = 1
-                            else:
-                                toFindCount[(concept, isNeg)] += 1
-                        conceptList = []        # The concepts in this set that have been found
-                        break   # Proceed to next 'start' in this sentence
-                # end of all the alternate concepts at this point in the sentence
-            # end of all the concepts in this sentence
-        # end of the sentences
-    # end of sentence concept sequence set
-
     return
 
 
@@ -1615,3 +243,569 @@ def addAdditionalConcept(concept, sentenceNo, start, j, description, negated, re
         # Now see if this has implications for the solution
         d.sc.solutionAddAdditionalConcept(concept, sentenceNo, start, j, negated, depth + 1)
     return
+
+
+def cleanDocument():
+    '''
+    Clean d.rawClinicalDocument, saving the cleaned document in d.preparedDocument
+    '''
+
+    # Start by doing any solution specific document cleaning
+    d.sp.solutionCleanDocument()
+
+    # Clean the text document
+    newDocument = []
+    for line in d.preparedDocument.split('\n'):
+        # logging.debug('Next line is (%s)', line)
+        cleanLine = line.rstrip()
+
+        # Now deal with any labels
+        for label, newLabel in d.labels:
+            # logging.debug('Checking for label (%s) and replacing with label(%s)', label.pattern, newLabel)
+            if label.match(cleanLine) is not None:
+                logging.debug('Label(%s) found', label.match(cleanLine).match())
+                cleanLine = label.sub(newLabel, cleanLine)
+                if len(newDocument) > 0:
+                    # Change a colon at the end of the previous line, if present, to a full stop
+                    newDocument[-1] = d.noColon.sub(r'.', newDocument[-1])
+                    # Append a full stop to the end of the previous line if necessary
+                    newDocument[-1] = d.addPeriod.sub(r'\1.', newDocument[-1], count=1)
+
+        # Then change any commonly used terms into their technical equivalents
+        # logging.debug('line before replacements:%s', cleanLine)
+        for common, technical in d.terms:
+            # logging.debug('Replacing (%s) with (%s)', common.pattern, technical)
+            cleanLine = common.sub(technical, cleanLine)
+        # logging.debug('line with replacements:%s', cleanLine)
+
+        # And skip blank lines
+        # logging.debug(cleanLine)
+        if cleanLine == '':
+            # logging.debug('empty line - continuing')
+            # Append a full stop to the end of the previous line to make it a sentence
+            if len(newDocument) > 0:
+                newDocument[-1] = d.addPeriod.sub(r'\1.', newDocument[-1], count=1)
+            continue
+
+        newDocument.append(cleanLine)
+
+    d.preparedDocument = '\n'.join(newDocument) + '\n'
+
+    # Now change any commonly used preamble terms into their non-technical equivalents
+    # We do that by treating the whole of the document as a single sentence and go looking for history.
+    # Preamble is everything from the start of the document up to the end of the first slab of history
+
+    # logging.debug('looking for preamble')
+    # Looking for the start of history in the document
+    thisText = d.preparedDocument
+
+    # logging.debug('Text document before preamble Terms changed')
+    # logging.debug(d.preparedDocument)
+    (changeFound, changeAt) = ch.checkPreamble(False, thisText)
+    if changeFound:            # We have history at the start or somewhere in, the document
+        if changeAt != 0:
+            document1 = thisText[:changeAt]        # Everything before the start of the first slab of history
+            document2 = thisText[changeAt:]        # The first slab of history and everything after that
+            someText = document2
+            # logging.debug('some preamble found (%s)', document1)
+            # Look for the end of history in the remainder of the document
+            (changeFound, changeAt) = ch.checkPreamble(True, someText)
+            if not changeFound:            # We have end of history at the start, or somewhere in the document
+                if changeAt != 0:
+                    document1 += someText[:changeAt]        # Preamble includes everything up to the end of the last slab of history
+                    document2 = someText[changeAt:]        # Everything that must remain unchanged
+            # logging.debug('preamble found (%s)', document1)
+            # Now change any commonly used preamble terms into their non-technical equivalents
+            for common, nonTechnical in d.preambleTerms:
+                # logging.debug('Replacing preamble (%s) with (%s) if found in preamble', common.pattern, nonTechnical)
+                document1 = common.sub(nonTechnical, document1)
+            d.preparedDocument = document1 + document2
+    # logging.debug('Text document after preamble Terms changed')
+    # logging.debug(d.preparedDocument)
+    return
+
+
+def AutoCode():
+    '''
+    AutoCode d.rawClinicalDocument
+    Call MetaMapLite to process this document
+    Then complete the coding by calling the solution specific complete() function
+    '''
+
+    # Prepare the clinical document
+    cleanDocument()
+    logging.debug('raw document:\n%s\n', d.rawClinicalDocument)
+    logging.debug('prepared document:\n%s\n', d.preparedDocument)
+
+    # logging.info('Text document after labels, terms preamble, terms and lists changed')
+    # logging.info(d.preparedDocument)
+
+    # Get the sentences and concepts using MetaMapLite and compute the start and end of each sentence
+    # (sentence are output in sentence order - we ignore some in order to skip 'history')
+
+    # Acquire the MetaMapLite lock - MetaMapLite may not be thread safe
+    d.MetaMapLiteServiceLock.acquire()
+
+    # Set up the parameter (the document) and call the MetaMapLite service
+    params = urlencode({'document':d.preparedDocument})
+    try:
+        thisMetaMapLiteConnection = client.HTTPConnection(d.MetaMapLiteHost, d.MetaMapLitePort)
+        thisMetaMapLiteConnection.request('POST', d.MetaMapLiteURL, params, d.MetaMapLiteHeaders)
+        response = thisMetaMapLiteConnection.getresponse()
+        if response.status != 200:
+            logging.critical('Invalid response from MetaMapLite Service:error %s', response.status)
+            return (d.EX_SOFTWARE, f'Invalid response from MetaMapLite Service:({repr(response.status)})')
+        responseData = response.read()
+        thisMetaMapLiteConnection.close()
+    except (client.NotConnected, client.InvalidURL, client.UnknownProtocol,client.UnknownTransferEncoding,client.UnimplementedFileMode,   client.IncompleteRead, client.ImproperConnectionState, client.CannotSendRequest, client.CannotSendHeader, client.ResponseNotReady, client.BadStatusLine) as thisE:
+        logging.critical('MetaMapLite Service request error:(%s)', repr(thisE))
+        d.MetaMapLiteServiceLock.release()
+        return (d.EX_SOFTWARE, f'MetaMapLite Service request error:({repr(thisE)})')
+
+    # Release the MetaMapLite lock
+    d.MetaMapLiteServiceLock.release()
+
+    logging.debug('MetaMapLite returned:%s', responseData)
+
+    # Parse the response into into a dictionary of sentences and concepts
+    try:
+        d.MetaMapLiteResponse = json.loads(responseData)
+    except ValueError as thisE:
+        logging.critical('Invalid JSON response (%s) from MetaMapLite Service - error(%s)', repr(responseData), repr(thisE))
+        return (d.EX_SOFTWARE, f'Invalid JSON response ({repr(response.status)}) from MetaMapLite Service:({repr(thisE)})')
+    logging.debug('MetaMapLite response:%s', json.dumps(d.MetaMapLiteResponse, indent=2))
+    # The MetaMapLite response is a dictionary with two keys - "concepts" and "sentences", each of which is an array of dictionaries
+    # for "concepts" each dictionary has only one key - being a MetaMapLite Concept ID. The value is a dictionary with five keys
+    #        "start" - where the text mapped to this concept starts in the text document
+    #        "length" - the length of the text mapped to this concept
+    #        "partOfSpeach" - coded representation of the part of speach (noun, verb, adverb etc)
+    #        "text" - the actual text mapped to this concept
+    #        "isNegated" - a boolean indicating whether or not this text/concept was preceded by a negation word (i.e. not)
+    # for "sentences" each dictionary has two keys
+    #        "start" - where the sentence started in the text document
+    #        "text" - the text of the sentence
+    # "sentences" are ordered.
+    # That is, the order of the sentences in the array matches the order of the text in the original text document.
+    # (each "start" value is larger than the preceeding "start" [by at least len("text")]
+
+    # Now complete the coding of this document
+    codingSuccess, reason = complete()
+    if codingSuccess != d.EX_OK:
+        logging.critical('AutoCoding failed: error(%s) with reason (%s)', codingSuccess, reason)
+        return codingSuccess
+
+    # Now analyze the results
+    d.sa.analyze()
+    return d.EX_OK
+
+
+def complete():
+    '''
+    Complete the coding of this document
+    '''
+
+    # The text document has been reassembled into sentences (full stops in the text helps).
+    # And the clinical terms have identified by MetaMapLite. All of this stored in the MetaMapLit respone (d.MetaMapLiteResponse).
+    # Next we create the "sentences" structure (d.sentences) where we associate the MetaThesaurus Concept IDs
+    # with their specific location with their specific 'sentence'.
+    # However, we also need to know which concepts are historical concepts and which concepts are current concepts.
+    # The main data structure here is 'sentences' - a list of the sentences in the clinical document.
+    # Each sentence in the list has the following attributes
+    #     [0] - a boolean that indicates that this sentence contains changes - parts of this sentence are not the same history as the start
+    #     [1] - a boolean that indicates the initial history state of this sentence (True => isHistory)
+    #     [2] - an integer - the character position of the start of this sentence within the document
+    #     [3] - an integer - the length of this sentence
+    #     [4] - a string - the text of this sentence
+    #     [5] - a list of all the places in this sentence where history flips (into/out of history)
+    #     [6] - a dictionary of the concepts within this sentence (a mini-document)
+    #     [7] - the section containg this sentence
+    #
+    #     Each mini-document (d.sentences[sentenceNo][6]) is a dictionary with an integer as the key (the start of this concept in the main document).
+    #     The value for each key ('start') is a list of alternate concepts, all of which start at the same character position in the main document.
+    #     Each alternate concept in the list is a dictionary of concept attributes.
+    #     The keys for each alternate concept dictionary in the list are
+    #         'length' - an integer - the number of characters in the sentence required to identifying this concept
+    #         'history' - a boolean that indicates that this concept is historical information - in a history sentence or after this sentence flipped into history
+    #         'concept' - a string - the MetaThesaurus concept.
+    #         'used' - a boolean that is set to True when a concept has been used to identify a higher concept
+    #         'text' - a string - the text at start, for 'length', which MetaMapLite found to be 'concept'.
+    #         'partOfSpeech' - a sting - the part of speech tag (code) that indicates how this concept was used in the sentence (noun, adverb, adjective etc)
+    #         'negation' - a string that indicates that this is a positive ('0'), negative ('1') or ambiguous ('2') concept
+    #         'description' - a string - the description of this concept (which may differ from the text matched to this concept).
+
+    # Process the returned sentences
+    d.sentences=[]    # The sentence/sentence part, to which we will attach mini documents of MetaThesaurus Concepts
+    inHistory = False    # We assume the text document starts by referencing the present
+    currentSection = 'None'
+    DOSeol = False          # Check for DOS/Windows end of line characters
+    lastSentence = d.MetaMapLiteResponse['sentences'][-1]
+    if (lastSentence['start'] + len(lastSentence['text']) + 1) < len(d.preparedDocument):
+        DOSeol = True
+    for sentenceNo, sentence in enumerate(d.MetaMapLiteResponse['sentences']):        # process each sentence
+        if DOSeol:
+            thisStart = sentence['start'] + sentenceNo        # The start of the current sentence is DOS/Windows land
+        else:
+            thisStart = sentence['start']        # The start of the current sentence
+        thisText = sentence['text']            # The text of the current sentence
+        thisText = thisText.replace('\n', ' ')            # Replace any embedded newlines with spaces
+        thisText = thisText.rstrip()
+        section = getSection(currentSection, thisText)        # Get the section for this sentence
+        currentSection = section
+        d.sentences.append([False, inHistory, thisStart, len(thisText), thisText, [], {}, section])
+        # We need to know if this sentence is in a history section, or just contains the word(s) implying 'history' somewhere in the sentence
+        firstChange = True
+        lastChange = 0
+        depth = 0
+        changesAt, matchLen = ch.checkHistory(inHistory, thisText, depth)
+        while changesAt is not None:        # Bounced in or out of history mid sentence
+            if firstChange and (changesAt == 0):            # Changed at the start of the text which is the start of the sentence
+                d.sentences[-1][1] = not inHistory
+            else:
+                d.sentences[-1][0] = True    # Does contain history changes somewhere
+                if len(d.sentences[-1][5]) == 0:
+                    d.sentences[-1][5].append(changesAt)
+                else:
+                    changesAt += d.sentences[-1][5][-1] + lastChange
+                    d.sentences[-1][5].append(changesAt)
+            firstChange = False
+            lastChange = matchLen
+            inHistory = not inHistory
+            thisText = thisText[changesAt + lastChange:]
+            changesAt, matchLen = ch.checkHistory(inHistory, thisText, depth)
+
+    # Now get the MetaThesaurus concepts (MetaMapLite returned them as a dictionary)
+    # And add them to the appropriate sentences as mini documents.
+    # Concepts are returned as a list of dictionaries. Each dictionary has a single key - the MetaThesaurus Concept ID
+    # The 'value' associated with each Concept ID is a dictionary of the attributes of that Concept ID
+    # this.logger.debug('Concepts')
+    for thisConcept in d.MetaMapLiteResponse['concepts']:
+        conceptID = list(thisConcept.keys())[0]
+        logging.debug('Concept:%s', repr(thisConcept))
+        thisStart = int(thisConcept[conceptID]['start'])
+        length = int(thisConcept[conceptID]['length'])
+        partOfSpeech = str(thisConcept[conceptID]['partOfSpeech'])
+        thisText = str(thisConcept[conceptID]['text'])
+        thisText = thisText.replace('\n', ' ')            # Replace any embedded newlines with spaces
+        thisConcept[conceptID]['text'] = thisText
+        isNegated = thisConcept[conceptID]['isNegated']
+        if isNegated:
+            isNegated = '1'
+        else:
+            isNegated = '0'
+
+        # Find the relevant sentence for this concept
+        # The sentences array is ordered so
+        sentenceNo = None
+        lastJJ = None
+        for jj, sentence in enumerate(d.sentences):
+            lastJJ = jj
+            if sentence[2] + sentence[3] < thisStart:    # This sentence ends before this concept starts
+                continue
+            if sentence[2] > thisStart:                # This sentence starts after this concept starts - which is an error
+                break
+            # We have found the right sentence
+            if sentence[2] + sentence[3] == thisStart:    # Can't start a concept with the last character of this sentence - must be next sentence
+                sentenceNo = jj + 1
+            else:
+                sentenceNo = jj
+            break
+
+        # Check that we did find a sentence for this concept
+        if sentenceNo is None:
+            logging.critical('Concept not in any sentence')
+            logging.critical('Concept at %d', thisStart)
+            if len(d.sentences) == 0:
+                logging.critical('THERE ARE NO SENTENCES!!!!')
+            else:
+                logging.critical('Last sentence starts at %d and ends at %d', d.sentences[-1][2], d.sentences[-1][2] + d.sentences[-1][3] - 1)
+            return (d.EX_SOFTWARE, f'Concept ({repr(thisConcept)}) at {thisStart} is not in a sentence')
+
+        # Check that this is a knownConcept
+        if conceptID not in d.knownConcepts:
+            if conceptID not in d.otherConcepts:
+                logging.warning('New Concept(%s) in sentence(%d), text(%s)', conceptID, sentenceNo, thisText)
+            continue
+        logging.info('Concept[%d:%d]:%s', thisStart, sentenceNo, repr(thisConcept))
+
+        # Check if this is a historical concept
+        isHistory = d.sentences[sentenceNo][1]
+        if d.sentences[sentenceNo][0]:            # This sentence contains history changes
+            # Check the history list for this concept
+            for changeAt in d.sentences[sentenceNo][5]:
+                if changeAt > thisStart - d.sentences[sentenceNo][2]:    # Next change is after this concept
+                    break
+                isHistory = not isHistory
+
+        # Replace this MetaThesaurusID with the SolutionID if there is a Solution equivalent for this MetaThesaurusID
+        if conceptID in d.equivalents:        # For equivalents we need to know both the original concept and the new equivalent concept
+            thisConcept = d.equivalents[conceptID]
+        else:
+            thisConcept = conceptID
+
+        # Check if we need to negate - nouns and adjective only
+        if partOfSpeech in ['NN', 'NNP', 'NNS', 'NNPS', 'JJ', 'JJR', 'JJS', 'RB', 'RBR', 'RBS']:
+            # Here we assume some that some phrases are demonstrative enough to apply to everything before or after them in the sentence
+            changeIt, reason, prePost =  ch.checkNegation(thisConcept, thisText, thisStart, sentenceNo, isNegated)
+            if changeIt != '0':
+                if changeIt == '1':
+                    logging.info('Concept %s (%d/%d) got negated - %s:%s', thisConcept, thisStart, lastJJ, prePost, reason)
+                else:
+                    logging.info('Concept %s (%d/%d) became ambigous - %s:%s', thisConcept, thisStart, lastJJ, prePost, reason)
+                isNegated = changeIt
+
+        # Check if the Solution requires this concept
+        if not d.sc.requireConcept(thisConcept, isNegated, partOfSpeech, isHistory, sentenceNo, thisStart, length, thisText):
+            continue
+
+        # Add this concept to the mini-document in this sentence. The min-document can have multiple concepts starting at the same spot.
+        document = d.sentences[sentenceNo][6]    # Sentences hold mini-documents
+        if thisStart not in document:
+            document[thisStart] = []
+        miniDoc = len(document[thisStart])
+        # Check if this concept already exists in this document at this point
+        found = False
+        for k in range(miniDoc):
+            if document[thisStart][k]['concept'] == thisConcept:
+                found = True
+                break
+        if found:
+            continue
+        document[thisStart].append({})
+        document[thisStart][miniDoc]['concept'] = thisConcept            # This concept ID (MetaThesaurus or SolutionID)
+        document[thisStart][miniDoc]['negation'] = isNegated                # This concept is negated
+        document[thisStart][miniDoc]['text'] = thisText                        # The text that matches this concept
+        document[thisStart][miniDoc]['length'] = length                    # The length of the text that matches this concept
+        document[thisStart][miniDoc]['history'] = isHistory                # Whether or not this concept exists in historical text
+        document[thisStart][miniDoc]['partOfSpeech'] = partOfSpeech        # The part of speech assigned by MetaMapLite
+        document[thisStart][miniDoc]['used'] = False                    # This concept has not yet been used
+
+        # Add a description if we have one
+        if thisConcept in d.solutionMetaThesaurus:
+            document[thisStart][miniDoc]['description'] = d.solutionMetaThesaurus[thisConcept]['description']
+        else:
+            logging.debug(thisConcept)
+            document[thisStart][miniDoc]['description'] = 'unknown'
+        if thisConcept != conceptID:
+            if conceptID in d.solutionMetaThesaurus:
+                document[thisStart][miniDoc]['description'] += '(was:' + d.solutionMetaThesaurus[conceptID]['description'] + ')'
+            else:
+                document[thisStart][miniDoc]['description'] += '(was:unknown)'
+
+        # Check if we need to modify this concept
+        ch.checkModified(thisConcept, document[thisStart][miniDoc]['negation'], sentenceNo, thisStart, miniDoc)
+        logging.debug('added %s to sentence[%d]', repr(document[thisStart][miniDoc]), sentenceNo)
+
+    # We have all the basic clinical concepts attached to sentences.
+    # Now we need to add the higher concepts - or compound concepts - or solution specific concepts
+    # Add to the mini-documents in each sentence any sentence implied concepts - word/pattern matching
+    # Known compound phrases, or known acronyms that have a specific clinical concept.
+    for sentenceNo, sentence in enumerate(d.sentences):            # Step through all the sentence in order
+        # Look for sentenceConcepts in this sentence.
+        # Scan the original text looking for any words and/or phrases that are commonly used within documents, which have implied MetaThesaurus Concept.
+        for (thisConcept, pattern, thisIsNeg, commonText) in d.sentenceConcepts:        # Check each sentence against all of the sentence concepts
+            # this.logger.debug('looking for %s in sentence[%d] (%s)', str(common), sentenceNo, str(this.sentences[sentenceNo][4]))
+            for match in pattern.finditer(sentence[4]):    # Process each match and add to the higherConcept to the document
+                thisStart = sentence[2] + match.start()
+                logging.debug('pattern(%s) found at %d', pattern.pattern, thisStart)
+                # Check if this is a historical concept
+                isHistory = sentence[1]
+                if sentence[0]:            # This sentence contains history
+                    # Check the history list for this concept
+                    for changeAt in sentence[5]:
+                        if changeAt > thisStart - sentence[2]:    # Next change is after this concept
+                            break
+                        isHistory = not isHistory
+
+                # Check if the sentence concept (text) has been negated
+                # We pass 'isNegated' as 0 so that checkNegation() will check for both negation and ambiguity
+                thisText = match.group()
+                changeIt, reason, prePost =  ch.checkNegation(thisConcept, thisText, thisStart, sentenceNo, 0)
+
+                # Need to XOR(isNeg, changeIt) as negating a negative is a positive
+                # If the 'concept' has a negated semantic meaning, but those word(s) have been negated
+                # then we have a sentence with a double negative - which must result in a positive concept
+                if thisIsNeg in ['0', '1']:        # An intended concept is unambiguous
+                    if changeIt in ['0', '1']:        # The matching text is unambigous
+                        if changeIt != thisIsNeg:    # Check if the negation has changed
+                            thisIsNeg = '1'        # negative concept that is unchanged, or a postive concept that got negated
+                        elif thisIsNeg == '1':
+                            thisIsNeg = '0'        # a postivie concept that is unchanged, or a negative concept that got negated
+                    else:                    # a positive or negative concept that became ambiguous
+                        thisIsNeg = changeIt
+                elif changeIt == '1':            # an ambiguous concept that was negated - becomes a negated concept
+                    thisIsNeg = '1'                    # 'possible flu' versus 'not possible flu' -> not flu
+
+                # Add to min-document
+                document = sentence[6]    # Sentences hold mini-documents
+                if thisStart not in document:
+                    document[thisStart] = []
+                miniDoc = len(document[thisStart])
+                document[thisStart].append({})
+                document[thisStart][miniDoc]['length'] = match.end() - match.start()
+                document[thisStart][miniDoc]['history'] = isHistory
+                document[thisStart][miniDoc]['concept'] = thisConcept
+                document[thisStart][miniDoc]['used'] = False
+                document[thisStart][miniDoc]['text'] = thisText
+                document[thisStart][miniDoc]['partOfSpeech'] = 'NN'
+                document[thisStart][miniDoc]['negation'] = thisIsNeg
+
+                # With a description if we have one
+                if thisConcept in d.solutionMetaThesaurus:
+                    document[thisStart][miniDoc]['description'] = d.solutionMetaThesaurus[thisConcept]['description']
+                else:
+                    document[thisStart][miniDoc]['description'] = commonText
+
+                # Check if we need to modify this concept
+                ch.checkModified(thisConcept, thisIsNeg, sentenceNo, thisStart, miniDoc)
+                logging.info('SentenceConcept(%s) found - adding %s to sentence[%d]', thisConcept, document[thisStart][miniDoc], sentenceNo)
+
+    # Now add any solution specific raw concepts to the document
+    # Note: We have not yet done negation, so these concepts may get negated, but are candidates for concept sets
+    # Note: Must be knownConcepts as we cannot change the configuration at this point
+    d.sc.addRawConcepts()
+
+    # At this point all the word based concepts have been added to the mini-documents. Two things remain to complete the process.
+    # 1. Do some extension of negation.
+    # 2. Look for sets of concepts and, when found, add in the higher concept at the point where the last thing in the set was found.
+    # We to do the negation extension first. Sets can contain positive and negative concepts.
+    # So we extend negation and then look for concept sets.
+
+    # Work through each of the sentences - extending negation
+    for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
+        logging.debug('Extending negation - processing sentence[%d]', sentenceNo)
+        sentenceStart = sentence[2]
+        sentenceLength = sentence[3]
+        document = sentence[6]    # Sentences hold mini-documents
+
+        # Do some gross negation - look for negations patterns within the text in the sentence
+        # Gross negatation patters are a start regular expression and and end regular expression
+        for grossStart, grossEnd, grossRange in d.grossNegation:
+            if sentenceNo + grossRange > len(d.sentences):
+                grossRange = len(d.sentences) - sentenceNo
+            theText = ''
+            for grossSentence in range(sentenceNo, sentenceNo + grossRange):
+                if theText != '':
+                    theText += ' '
+                theText += d.sentences[grossSentence][4]
+            logging.debug('Looking for gross negation pattern (%s.*%s) in (%s)', grossStart.pattern, grossEnd.pattern, theText)
+            matchStart = grossStart.search(theText)
+            if matchStart is not None:                # Start of gross negation found
+                startNegation = matchStart.end()        # Check after the end of the start of gross negation
+                matchEnd = grossEnd.search(theText[startNegation:])
+                if matchEnd is not None:                # End of gross negation found
+                    logging.info('Gross negation found - (%s..%s)', grossStart.pattern, grossEnd.pattern)
+                    startNegation += sentenceStart                        # Start after the start of gross negation marker
+                    endNegation = sentenceStart + matchEnd.start()        # And end at the end of gross negation marker
+                    logging.debug('negating from %d to %d', sentenceStart + startNegation, sentenceStart + endNegation)
+                    for grossSentence in range(sentenceNo, sentenceNo + grossRange):
+                        thisDocument = d.sentences[grossSentence][6]    # Sentences hold mini-documents
+                        for thisStart in sorted(thisDocument, key=int):        # Negate each concept between start and end of gross negation markers
+                            if thisStart < startNegation:
+                                continue
+                            if thisStart > endNegation:
+                                break
+                            for jj, miniDoc in enumerate(thisDocument[thisStart]):
+                                thisConcept = miniDoc['concept']
+                                thisDocument[thisStart][jj]['negation'] = 1        # Negate this concept
+                                logging.info('Negating concept(%s.*%s) [gross negation(%s)] in sentence[%d]',
+                                                 thisConcept, grossStart.pattern, grossEnd.pattern, sentenceNo)
+
+        # Extend negation and ambiguity for mini-document concepts in this sentence up to 'but' or from 'but'
+        butAt = []
+        buts = []
+        thisBut = None
+        # Find all the but boundaries in this sentence
+        for butBoundary in d.butBoundaries:
+            logging.debug('looking for butBoundary (%s)', butBoundary.pattern)
+            match = butBoundary.search(d.sentences[sentenceNo][4])
+            if match is not None:
+                butAt.append(match.start() + d.sentences[sentenceNo][2])
+                logging.debug('butBoundary found at %d', butAt[-1])
+        if len(butAt) > 0:        # At least one found
+            buts = sorted(butAt)
+            thisBut = 0
+
+        # Let the solution initialze it's own negate code
+        d.sc.initalizeNegation()
+
+        lastNegation = None        # Last concept was not negated - because there wasn't one
+        for thisStart in sorted(document, key=int):        # We step through all concepts, in sequence across this sentence
+            # Stop extending negation if we are crossing a but boundary
+            while (thisBut is not None) and (buts[thisBut] <= thisStart):
+                logging.debug('Crossing a butBoundary at %d in sentence %d', thisStart, sentenceNo)
+                lastNegation = None        # Last concept was not negated - because there wasn't one - we just crossed a but boundary
+                thisBut += 1
+                # Check if we've crossed the last but boundary
+                if thisBut == len(buts):
+                    thisBut = None
+
+            thisNegation = None            # Remember the negation of any noun or adjective at this point in the sentence
+            for jj, minDoc in enumerate(document[thisStart]):            # Step through the list of alternate concepts at this point in this sentence
+                if thisStart + minDoc['length'] > sentenceStart + sentenceLength:     # Skip concepts that extend beyond the end of this sentence
+                    break
+
+                # If this is a noun or adjective, then it is a concept of interest
+                if minDoc['partOfSpeech'] in ['NN', 'NNP', 'NNS', 'NNPS', 'JJ', 'JJR', 'JJT']:
+                    # Check if this is a concept is a knownConcept
+                    # We do not extend negation to concepts we do not understand
+                    thisConcept = minDoc['concept']
+                    if thisConcept not in d.knownConcepts:
+                        continue
+
+                    # If this noun or adjective has been negated or is ambiguous
+                    # then this will trigger negation/ambiguity extension for following concepts
+                    if minDoc['negation'] in [1, 2, 3]:
+                        thisNegation = minDoc['negation']
+
+                    # If the last noun or adjective was negated or was ambigous, then extend negation/ambiguity
+                    if lastNegation is not None:
+                        logging.info('Extending negation or ambiguity to %s - %s [%d/%d]', thisConcept, document[thisStart][jj]['description'], thisStart, jj)
+                        minDoc['negation'] = lastNegation
+                        thisNegation = lastNegation        # Continue extending negation
+
+            # Check if the solution wants to negate anything at this point in the document, before we update lastNegation
+            d.sc.extendNegation(sentenceNo, thisStart, lastNegation, thisNegation)
+
+            # If we had a negated noun or adjective, then we better extend negation from this point forward
+            if thisNegation is not None:
+                lastNegation = thisNegation
+
+
+    # Output the mini-documents to the log if required
+    for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
+        document = sentence[6]    # Sentences hold mini-documents
+        for thisStart in sorted(document, key=int):
+            for jj, miniDoc in enumerate(document[thisStart]):
+                logging.debug('[%d:%d:%d]%s', sentenceNo, thisStart, jj, miniDoc)
+
+
+    # Now add any solution specific concepts to the document
+    # Note: We have done negation extension, but not sentence or document list negation.
+    # So these concepts may get negated, if they are in sentence_negation_lists or document_negation_lists, but are candidates for concept sets
+    # Note: Must be knownConcepts as we cannot change the configuration at this point
+    d.sc.addSolutionConcepts()
+
+    # Now check the mini-documents for Document and Sentence Concept sets
+
+    # Do any negation lists
+    doNegationLists()
+
+    # Check for document and sentence sets in the history
+    ch.checkSets(True)
+
+    # Check for document and sentence sets in the non-history
+    ch.checkSets(False)
+
+    # Do any negation lists again - in case a sentence set created a negated higher concept which is in a Negation List
+    doNegationLists()
+
+    # Now add any final solution specific concepts to the document
+    # Note: We have done all negation and concept set checking, so these concepts are not candidates for concept sets
+    # Note: Must be knownConcepts as we cannot change the configuration at this point
+    d.sc.addFinalConcepts()
+
+    # Do any solution completion tasks
+    d.sc.complete()
+
+    return (d.EX_OK, 'success')
+

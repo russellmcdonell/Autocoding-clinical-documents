@@ -1,5 +1,5 @@
 # pylint: disable=line-too-long, broad-exception-caught, invalid-name, too-many-lines, too-many-nested-blocks
-# pylint: disable=too-many-locals, too-many-branches, too-many-statements
+# pylint: disable=too-many-locals, too-many-branches, too-many-statements, unused-import
 
 '''
 This is the histopathology autocoding analysis module
@@ -9,6 +9,7 @@ import sys
 import os
 import logging
 import functions as f
+import excelFunctions as excel
 import data as d
 
 
@@ -26,22 +27,17 @@ def configure(wb):
 
     # Read in the AIHW Procedure and Finding codes and descriptions
     requiredColumns = ['AIHW', 'Description']
-    f.loadSimpleDictionarySheet(wb, 'analyze', 'AIHW Procedure', requiredColumns, 0, d.sd.AIHWprocedure)
-    f.loadSimpleDictionarySheet(wb, 'analyze', 'AIHW Finding', requiredColumns, 0, d.sd.AIHWfinding)
+    d.sd.AIHWprocedure = excel.loadSimpleDictionarySheet(wb, 'analyze', 'AIHW Procedure', requiredColumns, 0)
+    d.sd.AIHWfinding = excel.loadSimpleDictionarySheet(wb, 'analyze', 'AIHW Finding', requiredColumns, 0)
 
-    # Read in the SNOMED CT Sites
+    # Read in and check the SNOMED CT Sites
     requiredColumns = ['MetaThesaurusID', 'Site', 'SubSite']
-    this_df = f.checkWorksheet(wb, 'analyze', 'Site', requiredColumns, True)
-    for row in this_df.itertuples():
-        if row.MetaThesaurusID is None:
-            break
-        logging.debug("sheet(Site), columns(%s), row(%s)", requiredColumns, row)
-        concept = row.MetaThesaurusID
-        if concept in d.sd.Site:
+    d.sd.Site = excel.loadDictionaryDictionarySheet(wb, 'analyze', 'Site', requiredColumns)
+    for concept, row in d.sd.Site.items():
+        if concept in configConcepts:
             logging.critical('Attempt to redefine site(%s)', concept)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-
         # Check that this Site is a defined SNOMED_CT code
         if concept not in d.solutionMetaThesaurus:
             logging.critical('Site(%s) in worksheet(Site) in workbook(analyze) not in the SolutionMetaThesaurus workbook', concept)
@@ -51,23 +47,19 @@ def configure(wb):
             logging.critical('Site(%s) in worksheet(Site) in workbook(analyze) is not SNOMED_CT', concept)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Site[concept] = {}
         configConcepts.add(concept)
         d.sd.Site[concept]['snomed_ct'] = d.solutionMetaThesaurus[concept]['Source_code']
         d.sd.Site[concept]['desc'] = d.solutionMetaThesaurus[concept]['description']
-
         # Next validate site and subsite
-        if row.Site not in ['cervix', 'vagina', 'other', 'notStated']:
-            logging.critical('Site(%s) in worksheet(Site) in workbook(analyze) not in "cervix", "vagina", "other" or "notStated"', row.Site)
+        if row['Site'] not in ['Cervix', 'Vagina', 'Other', 'Not_Stated']:
+            logging.critical('Site(%s) in worksheet(Site) in workbook(analyze) not in "cervix", "vagina", "other" or "notStated"', row['Site'])
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Site[concept]['site'] = row.Site
-        if row.SubSite not in ['cervix', 'vagina', 'endom', 'other', 'notStated']:
-            logging.critical('SubSite(%s) in worksheet(Site) in workbook(analyze) not in "cervix", "vagina", "endom", "other" or "notStated"',
-                             row.SubSite)
+        if row['SubSite'] not in ['Cervix', 'Vagina', 'endom', 'Other', 'Not_Stated']:
+            logging.critical('SubSite(%s) in worksheet(Site) in workbook(analyze) not in "Cervix", "Vagina", "endom", "Other" or "Not_Stated"',
+                             row['SubSite'])
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Site[concept]['subsite'] = row.SubSite
 
     # Now check that we have configurations for a few, fixed MetaThesaurus Site codes
     if d.sd.cervixUteri not in d.sd.Site:
@@ -79,19 +71,15 @@ def configure(wb):
         logging.shutdown()
         sys.exit(d.EX_CONFIG)
 
-    # Read in the Findings
+    # Read in and check the Findings
     requiredColumns = ['MetaThesaurusID', 'Cervix', 'Vagina', 'Other', 'Not Stated']
-    this_df = f.checkWorksheet(wb, 'analyze', 'Finding', requiredColumns, True)
-    for row in this_df.itertuples():
-        if row.MetaThesaurusID is None:
-            break
-        logging.debug("sheet(Finding), columns(%s), row(%s)", requiredColumns, row)
-        concept = row.MetaThesaurusID
-        if concept in d.sd.Finding:
+    d.sd.Finding = excel.loadDictionaryDictionarySheet(wb, 'analyze', 'Finding', requiredColumns)
+    concepts = set()
+    for concept, row in d.sd.Finding.items():
+        if concept in configConcepts:
             logging.critical('Attempt to redefine finding(%s)', concept)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-
         # Check that this Finding is a defined SNOMED_CT code
         if concept not in d.solutionMetaThesaurus:
             logging.critical('Finding in worksheet(Site) in workbook(analyze) not in the SolutionMetaThesaurus workbook')
@@ -102,33 +90,28 @@ def configure(wb):
             logging.critical('Finding(%s) in worksheet(Site) in workbook(analyze) is not SNOMED_CT', concept)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Finding[concept] = {}
         configConcepts.add(concept)
         d.sd.Finding[concept]['snomed_ct'] = d.solutionMetaThesaurus[concept]['Source_code']
         d.sd.Finding[concept]['desc'] = d.solutionMetaThesaurus[concept]['description']
 
         # Next validate Cervix, Vagina, Other and Not Stated
         # We have to map MetaThesaurus codes to AIHW S/E/O codes, based upon 'site'
-        if row.Cervix not in d.sd.AIHWfinding:
-            logging.critical('Cervix code(%s) in worksheet(Finding) in workbook(analyze) is not a valid AIHW Finding code', row.Cervix)
+        if row['Cervix'] not in d.sd.AIHWfinding:
+            logging.critical('Cervix code(%s) in worksheet(Finding) in workbook(analyze) is not a valid AIHW Finding code', row['Cervix'])
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Finding[concept]['cervix'] = row.Cervix
-        if row.Vagina not in d.sd.AIHWfinding:
-            logging.critical('Vagina code(%s) in worksheet(Finding) in workbook(analyze) is not a valid AIHW Finding code', row.Vagina)
+        if row['Vagina'] not in d.sd.AIHWfinding:
+            logging.critical('Vagina code(%s) in worksheet(Finding) in workbook(analyze) is not a valid AIHW Finding code', row['Vagina'])
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Finding[concept]['vagina'] = row.Vagina
-        if row.Other not in d.sd.AIHWfinding:
-            logging.critical('Other code(%s) in worksheet(Finding) in workbook(analyze) is not a valid AIHW Finding code', row.Other)
+        if row['Other'] not in d.sd.AIHWfinding:
+            logging.critical('Other code(%s) in worksheet(Finding) in workbook(analyze) is not a valid AIHW Finding code', row['Other'])
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Finding[concept]['other'] = row.Other
-        if row.Not_Stated not in d.sd.AIHWfinding:
+        if row['Not_Stated'] not in d.sd.AIHWfinding:
             logging.critical('Not Stated code(%s) in worksheet(Finding) in workbook(analyze) is not a valid AIHW Finding code', row.Not_Stated)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Finding[concept]['notStated'] = row.Not_Stated
 
     # Now check that we have configurations for a few, fixed MetaThesaurus Finding codes
     if d.sd.normalCervixCode not in d.sd.Finding:
@@ -144,19 +127,14 @@ def configure(wb):
         logging.shutdown()
         sys.exit(d.EX_CONFIG)
 
-    # Read in the Procedures
+    # Read in and check the Procedures
     requiredColumns = ['MetaThesaurusID', 'Cervix', 'Vagina', 'Other', 'Not Stated', 'Cervix Rank', 'Vagina Rank', 'Other Rank', 'Not Stated Rank']
-    this_df = f.checkWorksheet(wb, 'analyze', 'Procedure', requiredColumns, True)
-    for row in this_df.itertuples():
-        if row.MetaThesaurusID is None:
-            break
-        logging.debug("sheet(Procedure), columns(%s), row(%s)", requiredColumns, row)
-        concept = row.MetaThesaurusID
-        if concept in d.sd.Procedure:
+    d.sd.Procedure = excel.loadDictionaryDictionarySheet(wb, 'analyze', 'Procedure', requiredColumns)
+    for concept, row in d.sd.Procedure.items():
+        if concept in configConcepts:
             logging.critical('Attempt to redefine procedure(%s)', str(concept))
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-
         # Check that this Procedure is a defined SNOMED_CT code
         if concept not in d.solutionMetaThesaurus:
             logging.critical('Procedure(%s) in worksheet(Site) in workbook(analyze) not in sheet SolutionMetaThesaurus', concept)
@@ -166,7 +144,6 @@ def configure(wb):
             logging.critical('Procedure(%s) in worksheet(Site) in workbook(analyze) is not SNOMED_CT', concept)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Procedure[concept] = {}
         configConcepts.add(concept)
         d.sd.Procedure[concept]['snomed_ct'] = d.solutionMetaThesaurus[concept]['Source_code']
         d.sd.Procedure[concept]['desc'] = d.solutionMetaThesaurus[concept]['description']
@@ -174,161 +151,113 @@ def configure(wb):
         # Next validate Cervix, Vagina, Other, Not Stated, Cervix Rank, Vagina Rank, Other Rank, Not Stated Rank
         # We have to map SNOMED_CT procedure codes to AIHW procedure codes,
         # but then only report the one most significant procedure (highest rank)
-        d.sd.Procedure[concept]['site'] = {}
-        d.sd.Procedure[concept]['site']['cervix'] = row.Cervix
-        if (row.Cervix not in d.sd.AIHWprocedure) and (row.Cervix != '99'):
-            logging.critical('Cervix code(%s) in worksheet(Procedure) in workbook(analyze) is not a valid AIHW Procedure code', row.Cervix)
+        if (row['Cervix'] not in d.sd.AIHWprocedure) and (row['Cervix'] != '99'):
+            logging.critical('Cervix code(%s) in worksheet(Procedure) in workbook(analyze) is not a valid AIHW Procedure code', row['Cervix'])
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        if (row.Vagina not in d.sd.AIHWprocedure) and (row.Vagina != '99'):
-            logging.critical('Vagina code(%s) in worksheet(Procedure) in workbook(analyze) is not a valid AIHW Procedure code', row.Vagina)
+        if (row['Vagina'] not in d.sd.AIHWprocedure) and (row['Vagina'] != '99'):
+            logging.critical('Vagina code(%s) in worksheet(Procedure) in workbook(analyze) is not a valid AIHW Procedure code', row['Vagina'])
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Procedure[concept]['site']['vagina'] = row.Vagina
-        if (row.Other not in d.sd.AIHWprocedure) and (row.Other != '99'):
+        if (row['Other'] not in d.sd.AIHWprocedure) and (row['Other'] != '99'):
             logging.critical('Other code(%s) in worksheet(Procedure) in workbook(analyze) is not a valid AIHW Procedure code', row.Other)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Procedure[concept]['site']['other'] = row.Other
-        if (row.Not_Stated not in d.sd.AIHWprocedure) and (row.Not_Stated != '99'):
-            logging.critical('Not Stated code(%s) in worksheet(Procedure) in workbook(anallyze) is not a valid AIHW Procedure code', row.Not_Stated)
+        if (row['Not_Stated'] not in d.sd.AIHWprocedure) and (row['Not_Stated'] != '99'):
+            logging.critical('Not Stated code(%s) in worksheet(Procedure) in workbook(anallyze) is not a valid AIHW Procedure code', row['Not_Stated'])
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.Procedure[concept]['site']['notStated'] = row.Not_Stated
-        d.sd.Procedure[concept]['rank'] = {}
-        d.sd.Procedure[concept]['rank']['cervix'] = row.Cervix_Rank
-        d.sd.Procedure[concept]['rank']['vagina'] = row.Vagina_Rank
-        d.sd.Procedure[concept]['rank']['other'] = row.Other_Rank
-        d.sd.Procedure[concept]['rank']['notStated'] = row.Not_Stated_Rank
 
     # THE FOLLOWING ARE 'complete' DATA STRUCTURES - data structures required by the 'complete' module,
     # but the validity of the 'complete' configuration data depends upon 'analysis' data.
     # Hence they cannot be loaded until after the preceeding 'analyze' worksheets.
 
-    # Read in the Site implied concepts
+    # Read in and chedk the Site implied concept sets
     requiredColumns = ['MetaThesaurusID', 'HistopathologySiteID']
-    this_df = f.checkWorksheet(wb, 'analyze', 'site implied', requiredColumns, True)
-    thisData = this_df.values.tolist()
-    for record in thisData:
-        if record[0] is None:
-            break
-        logging.debug("sheet(site implied), columns(%s), record(%s)", requiredColumns, record)
-        concept = record[0]
-        if concept in d.sd.SiteImplied:
+    d.sd.SiteImplied = excel.loadDictionarySetSheet(wb, 'analyze', 'site implied', requiredColumns)
+    isDefined = set()
+    for concept, row in d.sd.SiteImplied.items():
+        if concept in isDefined:
             logging.critical('Attempt to redefine list of implied sites for concept(%s) in worksheet(site impllied) in workbook(analyze)', concept)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.SiteImplied[concept] = set()
-        j = 1
-        while (j < len(record)) and (record[j] is not None):
-            implied = record[j]
+        isDefined.add(concept)
+        for implied in row:
             if implied not in d.sd.Site:
                 logging.critical('Attempt to define an implied Site(%s) for concept(%s) in worksheet(site implied) in workbook(analyze), but (%s) is not defined as a Site',
                                  implied, concept, implied)
                 logging.shutdown()
                 sys.exit(d.EX_CONFIG)
-            d.sd.SiteImplied[concept].add(implied)
-            j += 1
-        configConcepts.add(concept)
 
-    # Read in the Finding implied concepts
+    # Read in and chedk the Finding implied concept sets
     requiredColumns = ['MetaThesaurusID', 'HistopathologyFindingID']
-    this_df = f.checkWorksheet(wb, 'analyze', 'finding implied', requiredColumns, True)
-    thisData = this_df.values.tolist()
-    for record in thisData:
-        if record[0] is None:
-            break
-        logging.debug("sheet(finding implied), columns(%s), record(%s)", requiredColumns, record)
-        concept = record[0]
-        if concept in d.sd.FindingImplied:
-            logging.critical('Attempt to redefine list of implied findings for concept(%s)', concept)
+    d.sd.FindingImplied = excel.loadDictionarySetSheet(wb, 'analyze', 'finding implied', requiredColumns)
+    isDefined = set()
+    for concept, row in d.sd.FindingImplied.items():
+        if concept in isDefined:
+            logging.critical('Attempt to redefine list of implied sites for concept(%s) in worksheet(site impllied) in workbook(analyze)', concept)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.FindingImplied[concept] = set()
-        j = 1
-        while (j < len(record)) and (record[j] is not None):
-            implied = record[j]
+        isDefined.add(concept)
+        for implied in row:
             if implied not in d.sd.Finding:
-                logging.critical('Attempt to define an implied Finding(%s) for concept(%s) in worksheet(finding implied) in workbook(analyze), but (%s) is not defined as a Finding',
+                logging.critical('Attempt to define an implied Finding(%s) for concept(%s) in worksheet(site implied) in workbook(analyze), but (%s) is not defined as a Finding',
                                  implied, concept, implied)
                 logging.shutdown()
                 sys.exit(d.EX_CONFIG)
-            d.sd.FindingImplied[concept].add(implied)
-            j += 1
-        configConcepts.add(concept)
 
-    # Read in the Site restricted Finding concepts
+    # Read in and check the Site restricted Finding concepts
     # These Findings can only be paired with one of these sites
     requiredColumns = ['MetaThesaurusID', 'HistopathologySiteIDs']
-    this_df = f.checkWorksheet(wb, 'analyze', 'site restricted', requiredColumns, True)
-    thisData = this_df.values.tolist()
-    for record in thisData:
-        if record[0] is None:
-            break
-        logging.debug("sheet(site restricted), columns(%s), record(%s)", requiredColumns, record)
-        concept = record[0]
-        if concept in d.sd.SiteRestrictions:
+    d.sd.SiteRestrictions = excel.loadDictionarySetSheet(wb, 'analyze', 'site restricted', requiredColumns)
+    isDefined = set()
+    for concept, row in d.sd.SiteRestrictions.items():
+        if concept in isDefined:
             logging.critical('Attempt to redefine site restrictions list for finding(%s) in worksheet(site restricted) in workbook(analyze)', concept)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.SiteRestrictions[concept] = set()
         if concept not in d.sd.Finding:
             logging.critical('Attempt to define an restriction on Finding(%s) in worksheet(site restricted) in workbook(analyze), but (%s) is not defined as a Finding',
                              concept, concept)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        j = 1
-        while (j < len(record)) and (record[j] is not None):
-            restriction = record[j]
+        isDefined.add(concept)
+        for restriction in row:
             if restriction not in d.sd.Site:
                 logging.critical('Attempt to define a restriction of Site(%s) for Finding(%s) in worksheet(site restricted) in workbook(analyze), but (%s) is not defined as a Site',
                                  restriction, concept, restriction)
                 logging.shutdown()
                 sys.exit(d.EX_CONFIG)
-            d.sd.SiteRestrictions[concept].add(restriction)
-            j += 1
 
-    # Read in the Site impossible Finding concepts
+    # Read in and check the Site impossible Finding concepts
     # These Findings can never be paired with one of these Sites
-    this_df = f.checkWorksheet(wb, 'analyze', 'site impossible', requiredColumns, True)
-    thisData = this_df.values.tolist()
-    for record in thisData:
-        if record[0] is None:
-            break
-        logging.debug("sheet(site impossible), columns(%s), record(%s)", requiredColumns, record)
-        concept = record[0]
+    d.sd.SiteImpossible = excel.loadDictionarySetSheet(wb, 'analyze', 'site impossible', requiredColumns)
+    isDefined = set()
+    for concept, row in d.sd.SiteImpossible:
         if concept in d.sd.SiteImpossible:
             logging.critical('Attempt to redefine site impossible list for finding(%s) in worksheet(site impossible) in workbook(analyze)', concept)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.SiteImpossible[concept] = set()
         if concept not in d.sd.Finding:
             logging.critical('Attempt to define an impossible Site for Finding(%s) in worksheet(site impossible) in workbook(analyze), but (%s) is not defined as a Finding',
                              concept, concept)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        j = 1
-        while (j < len(record)) and (record[j] is not None):
-            restriction = record[j]
+        isDefined.add(concept)
+        for restriction in row:
             if restriction not in d.sd.Site:
                 logging.critical('Attempt to define an impossible Site(%s) for Finding(%s) in worksheet(site impossible) in workbook(analyze), but (%s) is not defined as a Site',
                                  restriction, concept, restriction)
                 logging.shutdown()
                 sys.exit(d.EX_CONFIG)
-            d.sd.SiteImpossible[concept].add(restriction)
-            j += 1
 
-    # Read in the Site likelyhood Finding concepts
+    # Read in and check the Site likelyhood Finding concepts
     # These Findings can be paired with anyone of these sites, but if they are, only one pairing
     # should be included in the analysis, and it should be the pairing with the highest rank
     requiredColumns = ['MetaThesaurusID', 'HistopathologySiteID|rank']
-    this_df = f.checkWorksheet(wb, 'analyze', 'site likely', requiredColumns, True)
-    thisData = this_df.values.tolist()
-    for record in thisData:
-        if record[0] is None:
-            break
-        # logging.debug("sheet(site likely), columns(%s), record(%s)", requiredColumns, record)
-        concept = record[0]
+    d.sd.tempDict = excel.loadDictionarySetSheet(wb, 'analyze', 'site likely', requiredColumns)
+    d.sd.SiteRank = {}
+    for concept, row in d.sd.tempDict.items():
         if concept not in d.sd.Finding:
             logging.critical('Attempt to define an likelyhood ranking for Finding(%s) in worksheet(site likely) in workbook(analyze), but (%s) is not defined as a Finding',
                              concept, concept)
@@ -339,9 +268,7 @@ def configure(wb):
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
         d.sd.SiteRank[concept] = {}
-        j = 1
-        while (j < len(record)) and (record[j] is not None):
-            likelyhood = record[j]
+        for likelyhood in row:
             bits = likelyhood.split('|')
             if len(bits) != 2:
                 logging.critical('Site|likelyhood (%s) for concept(%s) in worksheet(site likely) in workbook(analyze) is incorrectly formatted',
@@ -366,19 +293,15 @@ def configure(wb):
                 logging.shutdown()
                 sys.exit(d.EX_CONFIG)
             d.sd.SiteRank[concept][bits[0]] = rank
-            j += 1
 
-    # Read in the Site default Finding concepts
+    # Read in and check the Site default Finding concepts
     # These are the Sites to be paired with these Finding concepts if they remain unpaired.
     requiredColumns = ['MetaThesaurusID', 'HistopathologySiteID']
-    this_df = f.checkWorksheet(wb, 'analyze', 'site default', requiredColumns, True)
-    for row in this_df.itertuples():
-        if row.MetaThesaurusID is None:
-            break
-        # logging.debug("sheet(site default), columns(%s), row(%s)", requiredColumns, row)
-        concept = row.MetaThesaurusID
-        default = row.HistopathologySiteID
-        if concept in d.sd.SiteDefault:
+    d.sd.SiteDefault = excel.loadDictionaryDictionarySheet(wb, 'analyze', 'site default', requiredColumns)
+    isDefined = set()
+    for concept in d.sd.SiteDefault:
+        default = d.sd.SiteDefault[concept]
+        if concept in isDefined:
             logging.critical('Attempt to redefine default site for finding(%s) in worksheet(site default) in workbook(analyze) from (%s) to (%s)',
                              concept, d.sd.SiteDefault[concept], default)
             logging.shutdown()
@@ -393,18 +316,14 @@ def configure(wb):
                                  str(default), str(concept), str(default))
             logging.shutdown()
             sys.stdout.flush()
-        d.sd.SiteDefault[concept] = default
+        isDefined.add(concept)
 
     # Read in the concepts which imply a Diagnosis (Site/Finding pairs)
     requiredColumns = ['MetaThesaurusID', 'HistopathologySiteID', 'HistopathologyFindingID']
-    this_df = f.checkWorksheet(wb, 'analyze', 'diagnosis implied', requiredColumns, True)
-    for row in this_df.itertuples():
-        if row.MetaThesaurusID is None:
-            break
-        logging.debug("sheet(diagnosis implied), columns(%s), row(%s)", requiredColumns, row)
-        diagnosis = row.MetaThesaurusID
-        site = row.HistopathologySiteID
-        finding = row.HistopathologyFindingID
+    d.sd.tempDict = excel.loadDictionaryDictionarySheet(wb, 'analyze', 'diagnosis implied', requiredColumns)
+    for diagnosis in d.sd.tempDict:
+        site = d.sd.tempDict[diagnosis]['HistopathologySiteID']
+        finding = d.sd.tempDict[diagnosis]['HistopathologyFindingID']
         if site not in d.sd.Site:
             logging.critical('Attempt to define an implied diagnosis with Site(%s) for concept(%s) in worksheet(diagnosis implied) in workbook(analyze), but (%s) is not defined as a Site',
                              site, concept, site)
@@ -420,16 +339,13 @@ def configure(wb):
         d.sd.DiagnosisImplied[diagnosis].append((site, finding))
         configConcepts.add(diagnosis)
 
-    # Read in the concepts that imply a procedure the impliedt procedure
+    # Read in and check the concepts that imply a procedure the implied procedure
     requiredColumns = ['MetaThesaurusID', 'HistopathologyProcedureID']
-    this_df = f.checkWorksheet(wb, 'analyze', 'procedure implied', requiredColumns, True)
-    for row in this_df.itertuples():
-        if row.MetaThesaurusID is None:
-            break
-        logging.debug("sheet(procedure implied), columns(%s), row(%s)", requiredColumns, row)
-        concept = row.MetaThesaurusID
-        procedure = row.HistopathologyProcedureID
-        if concept in d.sd.ProcedureImplied:
+    d.sd.ProcedureImplied = excel.loadDictionaryDictionarySheet(wb, 'analyze', 'procedure implied', requiredColumns)
+    isDefined = set()
+    for concept in d.sd.ProcedureImplied:
+        procedure = d.sd.ProcedureImplied[concept]
+        if concept in isDefined:
             logging.critical('Attempt to redefine implied procedure for concept(%s) in worksheet(procedure implied) in workbook(analyze) from (%s) to (%s)',
                              concept, d.sd.ProcedureImplied[concept], procedure)
             logging.shutdown()
@@ -439,19 +355,16 @@ def configure(wb):
                              procedure, concept, procedure)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
-        d.sd.ProcedureImplied[concept] = procedure
+        isDefined.add(concept)
         configConcepts.add(concept)
 
-    # Read in the Site/Finding concept pairs that define a procedure concept and that procedure concept
+    # Read in and check the Site/Finding concept pairs that define a procedure concept and that procedure concept
     requiredColumns = ['HistopathologyProcedureID', 'HistopathologySiteID', 'HistopathologyFindingID']
-    this_df = f.checkWorksheet(wb, 'analyze', 'procedure defined', requiredColumns, True)
-    for row in this_df.itertuples():
-        if row.HistopathologyProcedureID is None:
-            break
-        # logging.debug("sheet(procedure defined), columns(%s), row(%s)", requiredColumns, row)
-        procedure = row.HistopathologyProcedureID
-        site = row.HistopathologySiteID
-        finding = row.HistopathologyFindingID
+    d.sd.tempList = excel.loadSimpleSheet(wb, 'analyze', 'procedure defined', requiredColumns)
+    for row in d.sd.tempList:
+        procedure = row[0]
+        site = row[1]
+        finding = row[2]
         if (site, finding) in d.sd.ProcedureDefined:
             logging.critical('Attempt to redefine procedureDefined diagnosis(%s,%s) in worksheet(procedure defined) in workbook(analyze) from (%s) to (%s)',
                              site, finding, d.sd.ProcedureDefined[(site, finding)], procedure)
@@ -470,31 +383,26 @@ def configure(wb):
         d.sd.ProcedureDefined[(site, finding)] = procedure
         configConcepts.add(procedure)
 
-    # Read in the report Site sequence concept sets - sets of MetaThesaurus ConceptIDs which, when found in sequence,
+    # Read in and check the report Site sequence concept sets - sets of MetaThesaurus ConceptIDs which, when found in sequence,
     # imply a higher MetaThesaurus ConceptID Site for the purposes of reporting.
     requiredColumns = ['SolutionID', 'MetaThesaurus or Solution IDs']
-    this_df = f.checkWorksheet(wb, 'analyze', 'report site seq concept sets', requiredColumns, True)
-    thisData = this_df.values.tolist()
-    for record in thisData:
-        if record[0] is None:
-            break
-        logging.debug("sheet(report site seq concept sets), columns(%s), record(%s)", requiredColumns, record)
-        site = record[0]
+    d.sd.tempList = excel.loadSimpleSheet(wb, 'analyze', 'report site seq concept sets', requiredColumns)
+    for row in d.sd.tempList:
+        site = row[0]
         if site not in d.sd.Site:
             logging.critical('Attempt to define a report site sequence concept set with Site(%s) in worksheet(report site seq concept sets) in workbook(analyze) but (%s) is not defined as a Site',
                              site, site)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
         configConcepts.add(site)
-        j = 1
         concepts = []
-        while (j < len(record)) and (record[j] is not None):
-            eachConcept = record[j]
-            concept, isNeg = f.checkConfigConcept(eachConcept)
+        for eachConcept in row[1:]:
+            if eachConcept is None:
+                break
+            concept, isNeg = excel.checkConfigConcept(eachConcept)
             concepts.append([concept, isNeg])
             configConcepts.add(concept)
-            j += 1
-        d.sd.ReportSites.append([site, concepts])       # The site and the associated list of concepts
+        d.sd.ReportSites.append([site, concepts])       # The site and the associated list of concept/isNeg pairs
 
     # Return the additional known concepts
     return configConcepts
@@ -570,7 +478,7 @@ def gridAppend (sentenceNo, start, thisSite, isHistory, thisFinding, AIHWcode, s
         # We save the sentence number for reporting purposes
         # If the AIHW code for this procedure is '7', then this is a hysterectomy procedure.
         # We only need to check the 'cervix' site because, for hysterectomies, the AIHW code is '7' for all sites.
-        if d.sd.Procedure[thisProcedure]['site']['cervix'] == '7':
+        if d.sd.Procedure[thisProcedure]['Cervix'] == '7':
             d.sd.hysterectomy.add((thisProcedure, sentenceNo))
         else:
             d.sd.otherProcedure.add((thisProcedure, sentenceNo))
@@ -618,7 +526,7 @@ def analyze():
                         # Check if this is a hysterectomy
                         # If the AIHW code for this procedure is '7', then this is a hysterectomy procedure.
                         # We only need to check the 'cervix' site because, for hysterectomies, the AIHW code is '7' for all sites.
-                        if d.sd.Procedure[concept]['site']['cervix'] == '7':
+                        if d.sd.Procedure[concept]['Cervix'] == '7':
                             d.sd.hysterectomy.add((concept, sentenceNo))
                             logging.info('saving hysterectomy procedure:%s - %s', str(concept), str(d.sd.Procedure[concept]['desc']))
                         else:
@@ -635,7 +543,7 @@ def analyze():
                     SentenceFindings[sentenceNo][start].append((concept, isHistory))        # The Sentence Finding(s)
                     logging.info('saving Finding:%s - %s', str(concept), str(d.sd.Finding[concept]['desc']))
                     # Check if this concept is an unsatifactory Finding
-                    if d.sd.Finding[concept]['cervix'] == 'SU':
+                    if d.sd.Finding[concept]['Cervix'] == 'SU':
                         d.sd.solution['unsatFinding'] = concept
                     continue
 
@@ -650,7 +558,7 @@ def analyze():
 
                     # Mark cervixFound or endomFound if appropriate
                     # By "found" we mean that these site were noted
-                    subsite = d.sd.Site[concept]['subsite']
+                    subsite = d.sd.Site[concept]['SubSite']
                     if subsite == 'cervix':
                         if not d.sd.solution['cervixFound']:
                             d.sd.solution['cervixFound'] = True
@@ -748,8 +656,8 @@ def analyze():
 
                 # If we found a Site add it to the grid, mark the Site as used and delete this Finding from SentenceFindings
                 if bestRank is not None:
-                    siteCode = d.sd.Site[bestSite]['site']
-                    subSiteCode = d.sd.Site[bestSite]['subsite']
+                    siteCode = d.sd.Site[bestSite]['Site']
+                    subSiteCode = d.sd.Site[bestSite]['SubSite']
                     findingCode = d.sd.Finding[thisFinding][siteCode]
                     gridAppend(sentenceNo, FindingStart, bestSite, bestSiteHistory, thisFinding, findingCode, subSiteCode)
                     # Delete this finding and move onto the next one
@@ -833,8 +741,8 @@ def analyze():
                             bestSiteHistory = thisSiteHistory
                 # If we found a Site add it to the grid, mark the Site as used and delete this Finding from SentenceFindings
                 if bestRank is not None:
-                    siteCode = d.sd.Site[bestSite]['site']
-                    subSiteCode = d.sd.Site[bestSite]['subsite']
+                    siteCode = d.sd.Site[bestSite]['Site']
+                    subSiteCode = d.sd.Site[bestSite]['SubSite']
                     findingCode = d.sd.Finding[thisFinding][siteCode]
                     gridAppend(sentenceNo, FindingStart, bestSite, bestSiteHistory, thisFinding, findingCode, subSiteCode)
                     # Delete this finding and move onto the next one
@@ -860,8 +768,8 @@ def analyze():
             for thisFinding, thisFindingHistory in SentenceFindings[sentenceNo][FindingStart]:
                 if thisFinding in d.sd.SiteDefault:    # Check if we have a default site
                     thisSite = d.sd.SiteDefault
-                    siteCode = d.sd.Site[thisSite]['site']
-                    subSiteCode = d.sd.Site[thisSite]['subsite']
+                    siteCode = d.sd.Site[thisSite]['Site']
+                    subSiteCode = d.sd.Site[thisSite]['SubSite']
                     findingCode = d.sd.Finding[thisFinding][siteCode]
                     gridAppend(sentenceNo, FindingStart, thisSite, thisSiteHistory, thisFinding, findingCode, subSiteCode)
                 else:
@@ -874,7 +782,10 @@ def analyze():
         # However, they are only report sites if all the associated concepts are found in the coded histopathology report
         foundSites = []
         for setNo, siteInfo in enumerate(d.sd.ReportSites):     # The Report Sites and their concept lists
-            conceptNo = 0           # Step through the concepts for this Report Site
+            # siteInfo[0] is the Report Site, siteInfo[1] is a list of pairs for this set
+            thisReportSite = siteInfo[0]
+            thisReportSet = siteInfo[1]
+            conceptNo = 0           # Step through the concepts for this Report Site in thisReportSet
             for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
                 document = sentence[6]      # Sentences hold mini-documents
                 for start in sorted(document, key=int):        # We step through all concepts in this sentence
@@ -889,8 +800,8 @@ def analyze():
 
                         # Check if this alternate concept at 'start' is the next one in this Report Site sequence of concept in this set
                         found = False
-                        thisNeg =  siteInfo[conceptNo][1]        # The desired negation
-                        if concept == siteInfo[conceptNo][0]:    # A matching concept
+                        thisNeg =  thisReportSet[conceptNo][1]        # The desired negation
+                        if concept == thisReportSet[conceptNo][0]:    # A matching concept
                             if thisNeg == isNeg:
                                 found = True        # With a mathing negation
                             elif (isNeg in ['2', '3']) and (thisNeg in ['2', '3']):
@@ -898,19 +809,19 @@ def analyze():
                         if not found:    # Check the special case of a repetition of the first concept in the set
                             # We don't handle repetitions within a set - just a repetition of the first concept
                             # i.e.looking for concept 'n' - found concept 0 [this set, array of concepts in dict, first entry, concept]
-                            if concept == siteInfo[0][0]:
+                            if concept == thisReportSet[0][0]:
                                 # Found the first concept - restart the multi-sentence counter
                                 conceptNo = 0
                             continue
                         logging.debug('Concept (%s) (for sentence Report Site Sequence concept set[%d]) found', concept, setNo)
                         conceptNo += 1      # Found so proceed to the next concept in this Report Site concept set
-                        if conceptNo == len(d.sd.ReportSites[setNo]):
+                        if conceptNo == len(thisReportSet):
                             # We have a full concept sequence set - so save this Report Site
-                            foundSites.append(d.sd.ReportSites[setNo][0])
+                            foundSites.append(thisReportSite)
 
         # Now check the foundSites to see if we can use any of them
         for thisSite in foundSites:
-            subsite = d.sd.Site[thisSite]['subsite']
+            subsite = d.sd.Site[thisSite]['SubSite']
             if subsite == 'cervix':         # A 'cervix' type Site
                 if d.sd.solution['cervixDone']:
                     continue
@@ -997,7 +908,7 @@ def analyze():
             # Check if this is a hysterectomy
             # If the AIHW code for this procedure is '7', then this is a hysterectomy procedure.
             # We only need to check the 'cervix' site because, for hysterectomies, the AIHW code is '7' for all sites.
-            if d.sd.Procedure[histProc]['site']['cervix'] == '7':
+            if d.sd.Procedure[histProc]['Cervix'] == '7':
                 d.sd.hysterectomy.add((histProc, sentenceNo))
             else:
                 d.sd.otherProcedure.add((histProc, sentenceNo))
@@ -1008,13 +919,13 @@ def analyze():
     # We have some defaults in case the grid only has 'Topography not assigned'
     topSite = d.sd.grid[0][0]
     if topSite != '':
-        TopSite = d.sd.Site[topSite]['site']
-        TopSubSite = d.sd.Site[topSite]['subsite']
-        if TopSubSite == 'notStated':
-            TopSubSite = 'other'
+        TopSite = d.sd.Site[topSite]['Site']
+        TopSubSite = d.sd.Site[topSite]['SubSite']
+        if TopSubSite == 'Not_Stated':
+            TopSubSite = 'Other'
     else:
-        TopSite = 'cervix'
-        TopSubSite = 'cervix'
+        TopSite = 'Cervix'
+        TopSubSite = 'Cervix'
     logging.debug('topSite:%s', str(TopSite))
 
     # Compute the SNOMED_CT procedure and AIHW procedure
@@ -1036,10 +947,14 @@ def analyze():
         rankSno = None
         # We need to print the highest ranked procedure
         for thisProc, thisSno in d.sd.otherProcedure:
-            if TopSubSite not in d.sd.Procedure[thisProc]['rank']:
-                thisRank = int(d.sd.Procedure[thisProc]['rank']['cervix'])
+            if TopSite == 'Vagina':
+                thisRank = int(d.sd.Procedure[thisProc]['Vagina_Rank'])
+            elif TopSite == 'Other':
+                thisRank = int(d.sd.Procedure[thisProc]['Other_Rank'])
+            elif TopSite == 'Not_Stated':
+                thisRank = int(d.sd.Procedure[thisProc]['Not_Stated_Rank'])
             else:
-                thisRank = int(d.sd.Procedure[thisProc]['rank'][TopSubSite])
+                thisRank = d.sd.Procedure[thisProc]['Cervix_Rank']
             if (thisRank > rank) and (thisRank != 99):        # Filter out invalid procedures
                 rank = thisRank
                 rankProc = thisProc
@@ -1055,7 +970,7 @@ def analyze():
                               rankProc, d.sd.Procedure[rankProc]['snomed_ct'], d.sd.Procedure[rankProc]['desc'])
             d.sd.reportSN_CTprocedure['code'] = d.sd.Procedure[rankProc]['snomed_ct']
             d.sd.reportSN_CTprocedure['desc'] = d.sd.Procedure[rankProc]['desc']
-            AIHWProc = d.sd.Procedure[rankProc]['site'][TopSite]
+            AIHWProc = d.sd.Procedure[rankProc][TopSite]
             if AIHWProc == '99':
                 d.sd.reportAIHWprocedure['code'] = 'WARNING'
                 d.sd.reportAIHWprocedure['desc'] = 'No Applicable Procedure specified'
@@ -1086,11 +1001,15 @@ def analyze():
         if proc in reportedProcs:
             continue
         logging.warning('Unused Procedure in sentence(%d):%s - %s', sno, proc, d.sd.Procedure[proc]['desc'])
-        if TopSubSite not in d.sd.Procedure[proc]['rank']:
-            thisRank = int(d.sd.Procedure[proc]['rank']['cervix'])
+        if TopSite == 'Vagina':
+            thisRank = int(d.sd.Procedure[proc]['Vagina_Rank'])
+        elif TopSite == 'Other':
+            thisRank = int(d.sd.Procedure[proc]['Other_Rank'])
+        elif TopSite == 'Not_Stated':
+            thisRank = int(d.sd.Procedure[proc]['Not_Stated_Rank'])
         else:
-            thisRank = int(d.sd.Procedure[proc]['rank'][TopSubSite])
-        AIHWProc = d.sd.Procedure[proc]['site'][TopSite]
+            thisRank = d.sd.Procedure[proc]['Cervix_Rank']
+        AIHWProc = d.sd.Procedure[proc][TopSite]
         if AIHWProc == '99':
             d.sd.solution['otherProcedures'].append([d.sd.Procedure[proc]['snomed_ct'], d.sd.Procedure[proc]['desc'], 'WARNING', 'No Applicable Procedure specified'])
         else:

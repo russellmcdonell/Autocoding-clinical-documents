@@ -47,6 +47,8 @@ SiteDefault = {}        # The dictionary of Findings and associated default Site
 DiagnosisImplied = {}   # The dictionary of concepts and two concepts (must be Site and Finding) that they imply
 ProcedureImplied = {}   # The dictionary of concepts and Procedure concepts that they imply
 ProcedureDefined = {}   # The dictionary of Procedure concepts and two concepts (must be Procedure and Site) that mean that this produre must have happened
+tempList = []           # A temporary list
+tempDict = {}           # A temporary dictionary
 
 # Report data
 historyProcedure = {}   # The dictionary of history procedures (key: location of procedure code in clinical document, value: concept)
