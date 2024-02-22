@@ -1,0 +1,56 @@
+BRI 2018 04064
+Specimen:           CERVICAL BIOPSY POSTERIOR LIP 6 O'CLOCK
+                    (ADDITIONAL REPORT ATTACHED - 22/01/18)
+
+Macroscopic:        (SAP/SP)
+
+The specimen consists of four pieces 10 x 5 x 4mm in aggregate.
+
+Microscopic:
+
+The cervical biopsy demonstrates the transformation zone.  The squamous
+mucosa demonstrates a high grade squamous intraepithelial lesion
+corresponding to cervical intraepithelial neoplasia 3 (CIN 3).  Very
+focally at the interface between the ectocervix and endocervical
+junction there is pronounced squamatisation of the CIN 3 extending down
+a cervical gland.  This squamatisation (paradoxical maturation) is
+normally suspicious for invasive carcinoma, however, on levels,
+convincing invasion into the cervical stroma is not definitively seen
+(although imminent invasion is suspected).  No desmoplastic stromal
+reaction is identified.  In this biopsy, the resection margin is clear
+of this suspicious foci.  P16 demonstrates positive block staining of
+the CIN 3 and MIB1 proliferation index shows full thickness staining.
+No glandular lesion is seen.  The CIN 3 is seen extending to peripheral
+margins.
+
+SUMMARY:  CERVICAL BIOPSY POSTERIOR LIP 6 O'CLOCK: CIN 3 AND
+          A SINGLE FOCUS SUSPICIOUS FOR IMMINENT INVASION
+          (PLEASE SEE DESCRIPTION).
+
+COMMENT:  A second opinion will be sort.
+
+Reported and checked by Dr Russell McDonell.
+
+ADDITIONAL REPORT ADDED BY DR RUSSELL MCDONELL - 22/01/18:
+
+This case has been reviewed by Dr Russell who agrees with a high grade
+squamous intraepithelial lesion (HSIL) with a focus that shows squamoid
+features extending down an endocervical gland. No invasive carcinoma is
+identified. The features are reminiscent of a recently described entity '
+pleomorphic HSIL'. Please see reference below.
+
+SUMMARY:  CERVICAL BIOPSY POSTERIOR LIP 6 O'CLOCK - HIGH GRADE
+          SQUAMOUS INTRAEPITHELIAL LESION (CIN2-3) NEGATIVE FOR
+          INVASION.
+
+Reference: Pathology. 2017 Aug;49(5):465-470. doi:
+10.1016/russell.mcdonell.2017.05.002. Epub 2017 Jun 27.
+High-grade squamous intraepithelial lesion (HSIL) of the cervix with
+bizarre cytological appearances ('pleomorphic HSIL'): a review of 19
+cases.
+McDonell RAM1.
+
+//CD4
+T83000/M67017
+R/rm/RM
+

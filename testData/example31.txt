@@ -1,0 +1,61 @@
+PATIENT   :Russell Alexander MCDONELL
+ UMRN      :B7308698                  DOCTOR            :McDonell, R.
+ SEX       :F                         DOC. ADDRESS      :NORFOLK ISLANK HOSPITAL,
+                                                         UNLOCKED BAG 2, NORFOLK ISLAND,
+                                                         3178
+ D.O.B.    :25-Oct-1974                                  
+ ADDRESS   :PO BOX 825                COLL. DATE        :16-Jan-2018
+            ROWVILL, 3178             DATE RECEIVED     :17-Jan-2018
+ ACC. NO.  :P183918501F               WARD              :ED, DPU
+ LAB. NO.  :Q18B001506K               CONSULTANT        :
+
+                   H I S T O P A T H O L O G Y    R E P O R T
+
+COPY TO:
+DR McDonell, Russell
+DR McDonell, Russell
+DR McDonell HOSPITAL, PWO
+
+SPECIMEN:
+Curettings and polyp.
+
+CLINICAL:
+Curettings and polypectomy.
+
+MACROSCOPIC:
+Multiple grey, soft friable fragments of tissue measuring in aggregate, 15 x 10
+x 2mm.  (mp/1b/nr)
+
+MICROSCOPIC:
+All the tissue has been processed and examined histologically.  Sections show a
+fragment of endometrium as well as multiple fragments of endocervical, lower
+uterine segment and ectocervical tissue.  The endometrium comprises of glands of
+varying shapes and sizes, with some which are tubular to others which are more
+dilated and irregular with ciliated cell change.  A couple of prominent spiral
+arterioles are noted.  The stroma varies from the usual endometrial type stroma
+to fragments with fibrous stroma.  At the end of one of the fibrous fragments, a
+small amount of endocervical type epithelium is noted.  No cytological atypia
+seen.
+
+The other fragments of ectocervical and endocervical tissue are unremarkable.
+No HPV effect.
+
+CONCLUSION:
+Curettings and polypectomy:  Benign endometrium with features in keeping with a
+polyp and portions of benign ectocervical and endocervical tissue.
+
+PATHOLOGIST:  RUSSELL MCDONELL
+
+
+*  OFFICE USE ONLY
+*  CHARGE: 0
+*  SNOP : T8400M8050
+*  SNOP:  T8300M0001
+*  CCR: T5;C1;S1;W1;E1;M1;O-
+*  MACRO : RM/RM
+*  REPORTER: rmcdonell
+*  CL:CL3,,1
+DATED: 22 Jan 2018
+ELECTRONICALLY VALIDATED:22 Jan 2018 16:38:16  rm04922
+
+

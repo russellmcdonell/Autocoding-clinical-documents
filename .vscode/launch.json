@@ -22,7 +22,7 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "cwd": "${workspaceFolder}/.",
-            "args": ["-F", "-S", "example1", "-v", "4" ]
+            "args": ["-F", "-S", "example1", "-v", "3" ]
         }
     ]
 }

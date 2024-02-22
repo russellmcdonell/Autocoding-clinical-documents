@@ -1,0 +1,60 @@
+HISTOLOGY REPORT
+----------------
+SPECIMEN NUMBER: 2018A000359
+
+SITE: CERVICAL BIOPSY.
+
+CLINICAL NOTES:
+LLETZ 2015 - CIN 3. F/U abnormal colp. Cervical biopsy.
+
+MACROSCOPIC:
+(Cervical biopsy).
+The specimen consists of a single pale tan piece of tissue measuring
+6 x 4 x 2mm. (RM:rm)
+
+MICROSCOPIC:
+RCPA structured  reporting for  excisions and  colposcopic biopsies
+for pre-invasive cervical neoplasia
+
+Microscopic description: The  specimen has been examined at multiple
+levels.  The  sections  show  a single  cervical   biopsy,  there is
+moderate loss of epithelium  present.  The  biopsy shows involvement
+by  low-grade   squamous     intraepithelial   lesion   (CIN  1) and
+koilocytosis  in keeping  with  HPV effect.   Focally,  the squamous
+cells  are  disorganised,  the  nuclei  are  slightly  enlarged  and
+irregular.    These  changes  are  limited  to  the  lower  third of
+epithelium.     There  is  no  high-grade   dysplasia  or   invasive
+malignancy.   There is  moderate active  chronic  cervicitis and the
+epithelium  focally  shows reactive  changes  and immature  squamous
+metaplasia.  There is no glandular atypia.
+
+Tissues  present:  Ectocervical  mucosa,  metaplastic  endocervical
+mucosa and underlying stroma.
+
+SCJ included in specimen: Yes.
+
+High-grade Squamous Intraepithelial Lesion: Not present.
+
+AIS: Not present.
+
+Stratified Mucin-producing Intraepithelial Lesion (SMILE): Not seen.
+
+Low-grade Squamous Intraepithelial Lesion: Present (CIN1).
+
+Other pathology:  Moderate  active chronic  cervicitis  and immature
+squamous metaplasia.
+
+Ancillary studies
+      HR HPV (not 16/18): Detected.
+      P16: Not performed.
+
+DIAGNOSIS:
+Cervical biopsy: LOW-GRADE  SQUAMOUS  INTRAEPITHELIAL LESION (CIN 1)
+AND KOILOCYTOSIS IN KEEPING WITH HPV EFFECT. (RM:rm)
+
+
+SNOMED: T83000-M67016, M69710
+
+ELECTRONICALLY AUTHORISED BY: Dr R. McDonell checked by Dr. R. McDonell,Cervical biopsy: LOW-GRADE  SQUAMOUS  INTRAEPITHELIAL LESION (CIN 1) 
+AND KOILOCYTOSIS IN KEEPING WITH HPV EFFECT. (RM:rm)
+

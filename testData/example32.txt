@@ -1,0 +1,68 @@
+PATIENT   :McDonell, Russell
+ UMRN      :A7946257                  DOCTOR            :McDonell, R.
+ SEX       :F                         DOC. ADDRESS      :GONE WEST GYNAECOLOGY, 3/132
+                                                         ISLAND STREET, NORFOLK ISLAND,
+                                                         3178, VIC
+ D.O.B.    :27-Nov-1992                                  
+ ADDRESS   :3 SHAW CLOSE              COLL. DATE        :17-Jan-2018
+            ROWVILLE, 3178            DATE RECEIVED     :18-Jan-2018
+ ACC. NO.  :P183471202E               WARD              :ED, DAY
+ LAB. NO.  :Q18B001650J               CONSULTANT        :
+
+                   H I S T O P A T H O L O G Y    R E P O R T
+
+
+
+COPY TO:
+DR McDonell, Russell
+DR McDonell, Russell
+
+SPECIMEN:
+LLETZ.
+
+CLINICAL:
+LLETZ biopsy; CIN2; Rx Depo-Provera
+
+MACROSCOPIC:
+An unorientated fragment of mucosa 15 x 11mm, with underlying tissue to a depth
+of 9mm bearing a central os, 5mm in width.  The specimen is cut into 8TS.
+(11p/8b/nr)
+BLOCK KEY:
+1-4:one slice, one piece each, 5-7:one slice, two pieces, containing the os,
+8:one slice, one piece.
+
+MICROSCOPIC:
+The entire LLETZ specimen has been sectioned and embedded into 8 blocks and
+shows representation of the transformation zone.  Two out of the eight blocks
+show a high grade squamous intraepithelial lesion (HSIL), equivalent to CIN2.
+This is characterised by squamous cells having enlarged, hyperchromatic nuclei
+with an elevated nuclear to cytoplasmic ratio, involving the lower two thirds of
+the squamous epithelium.  An occasional mitotic figure is seen extending to the
+mid-epithelial layers.  CIN2 spans a length of 0.9mm along the canal and
+involves the ectocervical margin.  It is well-clear of the endocervical and
+radial margins and does not involve the peripheral slices of the specimen.
+Patchy active chronic inflammation and foci of immature squamous metaplasia are
+also present.  There is no invasive malignancy or endocervical glandular atypia.
+
+CONCLUSION:
+LLETZ:  HSIL, equivalent to CIN2.
+- Present in 2 of 8 blocks.
+- Extending to the ectocervical margin.
+- Endocervical and radial margins clear.
+
+PATHOLOGIST:  RUSSELL MCDONELL
+
+
+
+*  OFFICE USE ONLY
+*  CHARGE: 0
+*  SNOP : T8300M7600, CIN2
+*  CCR: T3;C3;S5;W1;E1;M-;O-
+*  MACRO : RM/RM
+*  REPORTER: RM
+*  TYPIST: RM
+*  CL:CL5,,1
+DATED: 22 Jan 2018
+ELECTRONICALLY VALIDATED:22 Jan 2018 16:52:56  rm04922
+
+

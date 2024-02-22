@@ -198,3 +198,65 @@ As you can see, the 'analysis' is heavliy dependant upon the business requiremen
 upon the 'clinical' requirements. Whatever the 'solution', it is likely that the 'analysis' will have a lot of logic built in Python rather
 than logic built with data configuration. Hence, it is difficult to provide any guidance as to how the **UMLS** codes, automatically extracted
 from each clinical document, should be processed.
+
+# Flask
+The command line opion -F (or --Flask) causes the AutoCoding Clinical Documents project to run as both a website and an api server.
+## API Server
+The AutoCoding Clinical Documents project's api accepts a document in a POST request.
+There is only one parameter, a test string named "document".
+
+    openapi: 3.0.1
+    info:
+    title: AutoCode a clinical document
+    description: AutoCode a clinical document
+    contact:
+        email: russell.mcdonell@c-cost.com
+    version: 1.0.0
+    servers:
+    - url: localhost:5000/
+    paths:
+    /:
+        post:
+        summary: AutoCode a clinical document
+        description: AutoCode a clinical document
+        operationId: AutoCode
+        requestBody:
+            description: document
+            required: true
+            content:
+            application/json:
+                schema:
+                $ref: '#/components/schemas/clinicalDocument'
+        responses:
+            200:
+            description: Success
+            content:
+                application/json:
+                schema:
+                    $ref: '#/components/schemas/results'
+    components:
+    schemas:
+        clinicalDocument:
+        type: object
+        properties:
+            document:
+            type: string
+            example: "nothing found"
+        required:
+            - document
+        results:
+
+NOTE: the 'results' schema will very from solution to solution. Hopefully, each solution will document and maintain an 'openaip.yaml' file.
+
+## Website
+The website responds to a GET request by displaying a form with a large text box, into which the user can past a clinical document.
+Clicking on the 'AutoCode this please' button causes the pasted document to be sent to the AutoCoding Clinical Documents project api server.
+The website then renders the returned api data, which can be different to the output from the file base version, as they are independent
+pieces of code. The file based version code may choose to render other, less important information, of a diagnostic nature.
+
+As well as rendering the api data, the website also displays four links which will reveal
+* The Initial Document - the text pasted into the text box
+* The Prepared Document - the prepared document passed to MetaMapLite
+* The MetaMapLite coded Document - this alternating lines; a line from the Prepared Document, then one or more lines of MetaThesaurus codes[matching text](MetaThesaurus description). Only the code returned by MetaMapLite are included here.
+* The Completely coded Document - this alternating lines; a line from the Prepared Document, then one or more lines of Solution codes[matching text](MetaThesaurus description). This is the completely coded document which is used for the analysis.
+

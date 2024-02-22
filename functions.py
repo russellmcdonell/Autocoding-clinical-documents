@@ -114,7 +114,7 @@ def getSection(currentSection, text):
     '''
 
     for marker in d.sectionMarkers:
-        logging.debug('Checking section_marker:%s', marker[0].pattern)
+        # logging.debug('Checking section_marker:%s', marker[0].pattern)
         match = marker[0].search(text)
         if match is not None:        # Section found
             return marker[2]    # return section
@@ -133,15 +133,15 @@ def doNegationLists():
 
     # Look for concepts within sentence that are negated,
     # and which imply other concepts in the same sentence should be set to negative or ambiguous
-    logging.debug('doNegationLists - looking for sentence negatations')
+    # logging.debug('doNegationLists - looking for sentence negatations')
     for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
-        logging.debug('doNegationLists[sentences] - processing sentence[%d]', sentenceNo)
+        # logging.debug('doNegationLists[sentences] - processing sentence[%d]', sentenceNo)
         document = sentence[6]    # Sentences hold mini-documents
         section = sentence[7]        # The section for this sentence    - can be 'None'
         for thisStart in sorted(document, key=int):        # We step through all the places where there are concepts in this sentence
             for jj in range(len(document[thisStart])):            # Step through the list of alternate concepts at this point in this sentence
                 thisConcept = document[thisStart][jj]['concept']
-                logging.debug('checking concept (%s): %s', thisConcept, document[thisStart][jj])
+                # logging.debug('checking concept (%s): %s', thisConcept, document[thisStart][jj])
                 # Check if this is a negated concept that is in sentenceNegationLists
                 if (document[thisStart][jj]['negation'] == '1') and (thisConcept in d.sentenceNegationLists):        # Check negated concepts
                     # Check if this sentence is in an appropriate section
@@ -164,15 +164,15 @@ def doNegationLists():
                                         document[strt][k]['negation'] = '2'
 
     # Look for concepts within the document that are negated, and which imply other concepts within the document should be negated or made ambiguous
-    logging.debug('doNegationLists - looking for document negatations')
+    # logging.debug('doNegationLists - looking for document negatations')
     for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
-        logging.debug('doNegationLists[document] - processing sentence[%d]', sentenceNo)
+        # logging.debug('doNegationLists[document] - processing sentence[%d]', sentenceNo)
         document = sentence[6]    # Sentences hold mini-documents
         section = sentence[7]        # The section for this sentence
         for thisStart in sorted(document, key=int):        # We step through all the places where there are concepts in this sentence
             for jj in range(len(document[thisStart])):            # Step through the list of alternate concepts at this point in this sentence
                 thisConcept = document[thisStart][jj]['concept']
-                logging.debug('checking concept (%s): %s', thisConcept, document[thisStart][jj])
+                # logging.debug('checking concept (%s): %s', thisConcept, document[thisStart][jj])
                 # Check if this is a negated concept that is in documentNegationLists
                 if (document[thisStart][jj]['negation'] == '1') and (thisConcept in d.documentNegationLists):        # Check negated concepts
                     # Check if this sentence is in an appropriate section
@@ -266,7 +266,7 @@ def cleanDocument():
         for label, newLabel in d.labels:
             # logging.debug('Checking for label (%s) and replacing with label(%s)', label.pattern, newLabel)
             if label.match(cleanLine) is not None:
-                logging.debug('Label(%s) found', label.match(cleanLine).match())
+                # logging.debug('Label(%s) found', label.match(cleanLine).group())
                 cleanLine = label.sub(newLabel, cleanLine)
                 if len(newDocument) > 0:
                     # Change a colon at the end of the previous line, if present, to a full stop
@@ -337,11 +337,8 @@ def AutoCode():
 
     # Prepare the clinical document
     cleanDocument()
-    logging.debug('raw document:\n%s\n', d.rawClinicalDocument)
-    logging.debug('prepared document:\n%s\n', d.preparedDocument)
-
-    # logging.info('Text document after labels, terms preamble, terms and lists changed')
-    # logging.info(d.preparedDocument)
+    logging.info('raw document:\n%s\n', d.rawClinicalDocument)
+    logging.info('prepared document:\n%s\n', d.preparedDocument)
 
     # Get the sentences and concepts using MetaMapLite and compute the start and end of each sentence
     # (sentence are output in sentence order - we ignore some in order to skip 'history')
@@ -368,15 +365,13 @@ def AutoCode():
     # Release the MetaMapLite lock
     d.MetaMapLiteServiceLock.release()
 
-    logging.debug('MetaMapLite returned:%s', responseData)
-
     # Parse the response into into a dictionary of sentences and concepts
     try:
         d.MetaMapLiteResponse = json.loads(responseData)
     except ValueError as thisE:
         logging.critical('Invalid JSON response (%s) from MetaMapLite Service - error(%s)', repr(responseData), repr(thisE))
         return (d.EX_SOFTWARE, f'Invalid JSON response ({repr(response.status)}) from MetaMapLite Service:({repr(thisE)})')
-    logging.debug('MetaMapLite response:%s', json.dumps(d.MetaMapLiteResponse, indent=2))
+    # logging.debug('MetaMapLite response:%s', json.dumps(d.MetaMapLiteResponse, indent=2))
     # The MetaMapLite response is a dictionary with two keys - "concepts" and "sentences", each of which is an array of dictionaries
     # for "concepts" each dictionary has only one key - being a MetaMapLite Concept ID. The value is a dictionary with five keys
     #        "start" - where the text mapped to this concept starts in the text document
@@ -461,7 +456,7 @@ def complete():
         depth = 0
         changesAt, matchLen = ch.checkHistory(inHistory, thisText, depth)
         while changesAt is not None:        # Bounced in or out of history mid sentence
-            logging.debug('checkHistory() - bounced in/out of history at %d for %d characters', changesAt, matchLen)
+            # logging.debug('checkHistory() - bounced in/out of history at %d for %d characters', changesAt, matchLen)
             if firstChange and (changesAt == 0):            # Changed at the start of the text which is the start of the sentence
                 d.sentences[-1][1] = not inHistory
             else:
@@ -484,7 +479,7 @@ def complete():
     # this.logger.debug('Concepts')
     for thisConcept in d.MetaMapLiteResponse['concepts']:
         conceptID = list(thisConcept.keys())[0]
-        logging.debug('Concept:%s', repr(thisConcept))
+        # logging.debug('Concept:%s', repr(thisConcept))
         thisStart = int(thisConcept[conceptID]['start'])
         length = int(thisConcept[conceptID]['length'])
         partOfSpeech = str(thisConcept[conceptID]['partOfSpeech'])
@@ -529,7 +524,7 @@ def complete():
             if conceptID not in d.otherConcepts:
                 logging.warning('New Concept(%s) in sentence(%d), text(%s)', conceptID, sentenceNo, thisText)
             continue
-        logging.info('Concept[%d:%d]:%s', thisStart, sentenceNo, repr(thisConcept))
+        # logging.debug('Concept[%d:%d]:%s', thisStart, sentenceNo, repr(thisConcept))
 
         # Check if this is a historical concept
         isHistory = d.sentences[sentenceNo][1]
@@ -587,7 +582,7 @@ def complete():
         if thisConcept in d.solutionMetaThesaurus:
             document[thisStart][miniDoc]['description'] = d.solutionMetaThesaurus[thisConcept]['description']
         else:
-            logging.debug(thisConcept)
+            # logging.debug(thisConcept)
             document[thisStart][miniDoc]['description'] = 'unknown'
         if thisConcept != conceptID:
             if conceptID in d.solutionMetaThesaurus:
@@ -597,7 +592,9 @@ def complete():
 
         # Check if we need to modify this concept
         ch.checkModified(thisConcept, document[thisStart][miniDoc]['negation'], sentenceNo, thisStart, miniDoc)
-        logging.debug('added %s to sentence[%d]', repr(document[thisStart][miniDoc]), sentenceNo)
+        # logging.debug('added %s to sentence[%d]', repr(document[thisStart][miniDoc]), sentenceNo)
+
+    d.codedSentences = d.sentences.copy()       # Save the coded sentences
 
     # We have all the basic clinical concepts attached to sentences.
     # Now we need to add the higher concepts - or compound concepts - or solution specific concepts
@@ -610,7 +607,7 @@ def complete():
             # this.logger.debug('looking for %s in sentence[%d] (%s)', str(common), sentenceNo, str(this.sentences[sentenceNo][4]))
             for match in pattern.finditer(sentence[4]):    # Process each match and add to the higherConcept to the document
                 thisStart = sentence[2] + match.start()
-                logging.debug('pattern(%s) found at %d', pattern.pattern, thisStart)
+                # logging.debug('pattern(%s) found at %d', pattern.pattern, thisStart)
                 # Check if this is a historical concept
                 isHistory = sentence[1]
                 if sentence[0]:            # This sentence contains history
@@ -676,7 +673,7 @@ def complete():
 
     # Work through each of the sentences - extending negation
     for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
-        logging.debug('Extending negation - processing sentence[%d]', sentenceNo)
+        # logging.debug('Extending negation - processing sentence[%d]', sentenceNo)
         sentenceStart = sentence[2]
         sentenceLength = sentence[3]
         document = sentence[6]    # Sentences hold mini-documents
@@ -691,16 +688,16 @@ def complete():
                 if theText != '':
                     theText += ' '
                 theText += d.sentences[grossSentence][4]
-            logging.debug('Looking for gross negation pattern (%s.*%s) in (%s)', grossStart.pattern, grossEnd.pattern, theText)
+            # logging.debug('Looking for gross negation pattern (%s.*%s) in (%s)', grossStart.pattern, grossEnd.pattern, theText)
             matchStart = grossStart.search(theText)
             if matchStart is not None:                # Start of gross negation found
                 startNegation = matchStart.end()        # Check after the end of the start of gross negation
                 matchEnd = grossEnd.search(theText[startNegation:])
                 if matchEnd is not None:                # End of gross negation found
-                    logging.info('Gross negation found - (%s..%s)', grossStart.pattern, grossEnd.pattern)
+                    # logging.info('Gross negation found - (%s..%s)', grossStart.pattern, grossEnd.pattern)
                     startNegation += sentenceStart                        # Start after the start of gross negation marker
                     endNegation = sentenceStart + matchEnd.start()        # And end at the end of gross negation marker
-                    logging.debug('negating from %d to %d', sentenceStart + startNegation, sentenceStart + endNegation)
+                    # logging.debug('negating from %d to %d', sentenceStart + startNegation, sentenceStart + endNegation)
                     for grossSentence in range(sentenceNo, sentenceNo + grossRange):
                         thisDocument = d.sentences[grossSentence][6]    # Sentences hold mini-documents
                         for thisStart in sorted(thisDocument, key=int):        # Negate each concept between start and end of gross negation markers
@@ -720,11 +717,11 @@ def complete():
         thisBut = None
         # Find all the but boundaries in this sentence
         for butBoundary in d.butBoundaries:
-            logging.debug('looking for butBoundary (%s)', butBoundary.pattern)
+            # logging.debug('looking for butBoundary (%s)', butBoundary.pattern)
             match = butBoundary.search(d.sentences[sentenceNo][4])
             if match is not None:
                 butAt.append(match.start() + d.sentences[sentenceNo][2])
-                logging.debug('butBoundary found at %d', butAt[-1])
+                # logging.debug('butBoundary found at %d', butAt[-1])
         if len(butAt) > 0:        # At least one found
             buts = sorted(butAt)
             thisBut = 0
@@ -736,7 +733,7 @@ def complete():
         for thisStart in sorted(document, key=int):        # We step through all concepts, in sequence across this sentence
             # Stop extending negation if we are crossing a but boundary
             while (thisBut is not None) and (buts[thisBut] <= thisStart):
-                logging.debug('Crossing a butBoundary at %d in sentence %d', thisStart, sentenceNo)
+                # logging.debug('Crossing a butBoundary at %d in sentence %d', thisStart, sentenceNo)
                 lastNegation = None        # Last concept was not negated - because there wasn't one - we just crossed a but boundary
                 thisBut += 1
                 # Check if we've crossed the last but boundary
@@ -780,7 +777,8 @@ def complete():
         document = sentence[6]    # Sentences hold mini-documents
         for thisStart in sorted(document, key=int):
             for jj, miniDoc in enumerate(document[thisStart]):
-                logging.debug('[%d:%d:%d]%s', sentenceNo, thisStart, jj, miniDoc)
+                # logging.debug('[%d:%d:%d]%s', sentenceNo, thisStart, jj, miniDoc)
+                pass
 
 
     # Now add any solution specific concepts to the document
@@ -810,5 +808,7 @@ def complete():
 
     # Do any solution completion tasks
     d.sc.complete()
+
+    d.completedSentences = d.sentences.copy()       # Save the completely coded sentences
 
     return (d.EX_OK, 'success')

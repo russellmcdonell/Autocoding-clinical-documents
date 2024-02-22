@@ -1,0 +1,54 @@
+HISTOLOGY REPORT
+----------------
+SPECIMEN NUMBER: 2081A999329
+
+SITE: ENDOMETRIAL CURETTINGS. POUCH OF DOUGLAS.
+
+CLINICAL NOTES:
+Endometrial   curettings.   Pouch  of  Douglas  peritoneal   biopsy.
+Irregular bleeding, pelvic pain. ?Endometriosis
+
+MACROSCOPIC:
+1. (Endometrial curettings).
+The specimen  consists of a  strip of tan  tissue 20mm  x 5mm x 2mm.
+All embedded in one block.
+
+2. (Pouch of Douglas peritoneum).
+The specimen consists  of a single tan biopsy,  7mm x 5mm x 2mm. All
+embedded in one block. (RM:rm)
+
+MICROSCOPIC:
+Specimen  1  The  specimen  is  seen  to be  composed   of a  single
+endometrial fragment. This consist of closely packed tortuous glands
+showing secretory activity  within a mildly  oedematous stroma.  The
+glands  are  lined by  a  columnar  epithelium  most  of  which show
+secretory  activity.   The   intervening  stroma is  oedematous  and
+contains  collections of  small vessels.   There are  no features of
+hyperplasia, atypia or malignancy.
+
+Specimen  2 The  sections  of the  submitted  tissue  is  seen to be
+composed of  Fibrous tissue  in which  there is a single  small cyst
+lined by endometrial type epithelium and considered to be surrounded
+by a small  amount  endometrial  stroma.  A  separate focus  of what
+appears to be endometrial stroma is also present. Within the fibrous
+stroma there is also a sparse  chronic inflammatory cell infiltrate.
+Small vessels and occasional small groups of smooth muscle cells are
+also noted . The features are considered to be in keeping with those
+of endometriosis.
+
+DIAGNOSIS:
+Specimen  1 Uterine   curettings  - Showing  features  of  secretory
+endometrium.
+
+Specimen 2  Pouch of Douglas  peritoneal  biopsy -  Showing features
+considered in keeping with those of endometriosis.
+
+
+SNOMED: T84 M79320 TY4400 M76500
+
+ELECTRONICALLY AUTHORISED BY: DR RUSSELL MCDONELL,Specimen  1 Uterine   curettings  - Showing  features  of  secretory 
+endometrium.
+
+Specimen 2  Pouch of Douglas  peritoneal  biopsy -  Showing features 
+considered in keeping with those of endometriosis.
+

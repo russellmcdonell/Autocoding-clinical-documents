@@ -176,7 +176,7 @@ if __name__ == '__main__':
         logging.shutdown()
         sys.stdout.flush()
         sys.exit(d.EX_UNAVAILABLE)
-    logging.debug('Connection to MetaMapLite server tested')
+    # logging.debug('Connection to MetaMapLite server tested')
 
     # Check that the solution files all exist and appear correct.
     if not os.path.isdir(os.path.join('solutions', d.solution)):
@@ -231,7 +231,7 @@ if __name__ == '__main__':
         logging.fatal('Cannot import "solutionData.py" for solution "%s"', d.solution)
         logging.shutdown()
         sys.exit(d.EX_CONFIG)
-    logging.debug('Solution specific data loaded')
+    # logging.debug('Solution specific data loaded')
 
     # Check the solution 'prepare' Excel workbook
     wb = load_workbook(os.path.join('solutions', d.solution, 'prepare.xlsx'))
@@ -260,7 +260,7 @@ if __name__ == '__main__':
     # Now do any solution specific 'prepare' configuration and initialzation
     configConcepts = d.sp.configure(wb)
     d.knownConcepts.update(configConcepts)
-    logging.debug('Prepare module loaded and configured')
+    # logging.debug('Prepare module loaded and configured')
 
     # Check the solution 'complete' Excel workbook
     wb = load_workbook(os.path.join('solutions', d.solution, 'complete.xlsx'))
@@ -369,7 +369,7 @@ if __name__ == '__main__':
     # Now do any solution specific 'complete' configuration and initialzation
     configConcepts = d.sc.configure(wb)
     d.knownConcepts.update(configConcepts)
-    logging.debug('Complete module loaded and configured')
+    # logging.debug('Complete module loaded and configured')
 
     # Check the solution 'analyze' Excel workbook
     wb = load_workbook(os.path.join('solutions', d.solution, 'analyze.xlsx'))
@@ -385,7 +385,7 @@ if __name__ == '__main__':
         sys.exit(d.EX_CONFIG)
     for requiredFunction in ['configure', 'analyze']:
         if not hasattr(d.sa, requiredFunction):
-            logging.fatal('"analyzee" module in solution "%s" is missing the "%s" function', d.solution, requiredFunction)
+            logging.fatal('"analyze" module in solution "%s" is missing the "%s" function', d.solution, requiredFunction)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
     if isFlask:
@@ -396,14 +396,14 @@ if __name__ == '__main__':
                 sys.exit(d.EX_CONFIG)
     else:
         if not hasattr(d.sa, 'reportFile'):
-            logging.fatal('"analyzee" module in solution "%s" is missing the "reportFile" function', d.solution)
+            logging.fatal('"analyze" module in solution "%s" is missing the "reportFile" function', d.solution)
             logging.shutdown()
             sys.exit(d.EX_CONFIG)
 
     # Now do any solution specific 'analyze' configuration and initialzation
     configConcepts = d.sa.configure(wb)
     d.knownConcepts.update(configConcepts)
-    logging.debug('Analyze module loaded and configured')
+    # logging.debug('Analyze module loaded and configured')
 
     if isFlask:         # Run as a website and api service
         print(f'flsk:{flsk}')

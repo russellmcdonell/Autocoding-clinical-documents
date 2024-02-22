@@ -90,10 +90,10 @@ def checkHistory(inHistory, text, depth):
         matchLen    - int, the length of the matching text which triggered a  history change
     '''
 
-    logging.debug('checkHistory() - checking for history in text(%s)', text)
+    # logging.debug('checkHistory() - checking for history in text(%s)', text)
     # Check if we are in history and ran into something useful, or in useful text, but ran in to history
     if inHistory:        # We are in history - check to see if we've come to the end of this history section
-        logging.debug('checkHistory() - checking for leaving history in text(%s)', text)
+        # logging.debug('checkHistory() - checking for leaving history in text(%s)', text)
         # Check for the configured end of history markers (regular expression, ignore case)
         historyEndFound = False
         newStart = None
@@ -102,7 +102,7 @@ def checkHistory(inHistory, text, depth):
         for marker, isStart in d.historyMarkers:
             if isStart:    # This is a start of history marker, but we are in history, so skip this marker
                 continue
-            logging.debug('checkHistory() - checking endOfHistory marker:%s[%s]', marker.pattern, marker.flags)
+            # logging.debug('checkHistory() - checking endOfHistory marker:%s[%s]', marker.pattern, marker.flags)
             match = marker.search(text)
             if match is not None:        # End of history found
                 historyEndFound = True        # Some document 'end of history' text found
@@ -111,20 +111,20 @@ def checkHistory(inHistory, text, depth):
                     newStart = match.start()
                     matchLen = len(match.group())
         if historyEndFound:        # We did bounced out of history
-            logging.debug('checkHistory() - end of history found at %d with "%s"', newStart, text[newStart:newStart + matchLen])
+            # logging.debug('checkHistory() - end of history found at %d with "%s"', newStart, text[newStart:newStart + matchLen])
             return newStart, matchLen
         # We are still in history, or at least we think we are - the specific solution may have a different answer
         historyEnds, scChangeAt, scLen = d.sc.solutionCheckHistory(inHistory, text)
         # The solution can indicate that history ended at a previous sentence
         # All sentences between this new end of history and the current sentence are not history
         if historyEnds == 0:        # History ends with this sentence
-            logging.debug('checkHistory() - solution say history ended at the start of this sentence')
+            # logging.debug('checkHistory() - solution say history ended at the start of this sentence')
             return scChangeAt, scLen
         elif historyEnds > 0:        # History ended with a previous sentence
             # History ended several sentences ago - update those sentences to not history
             # We need to reprocess these sentence as they were processed as though they were in history.
             # However this is recursive, so check that we haven't fallen into a recursive loop
-            logging.debug('checkHistory() - solution says history ended %d sentences ago', historyEnds)
+            # logging.debug('checkHistory() - solution says history ended %d sentences ago', historyEnds)
             if depth > 2:
                 logging.critical('Too many levels of recursion when checking history')
                 logging.shutdown()
@@ -140,7 +140,7 @@ def checkHistory(inHistory, text, depth):
                 lastChange = 0
                 changesAt, matchLen = checkHistory(thisHistory, txt, depth + 1)
                 while changesAt is not None:        # Bounced in or out of history mid sentence
-                    logging.debug('checkHistory() - bounced in/out of history at %d for %d characters', changesAt, matchLen)
+                    # logging.debug('checkHistory() - bounced in/out of history at %d for %d characters', changesAt, matchLen)
                     if firstChange and (changesAt == 0):            # Changed at the start of the text which is the start of the sentence
                         d.sentences[-1 - fixIt][1] = not thisHistory
                     elif len(d.sentences[-1 - fixIt][5]) == 0:    # Check for previous changes
@@ -159,7 +159,7 @@ def checkHistory(inHistory, text, depth):
         else:
             return None, None
     else:        # We are not in history - check that we didn't fall into another history section
-        logging.debug('Checking for entering history in text(%s)', text)
+        # logging.debug('Checking for entering history in text(%s)', text)
         # Check for the configured start of history markers (regular expression, ignore case)
         historyFound = False
         newStart = None
@@ -168,7 +168,7 @@ def checkHistory(inHistory, text, depth):
         for marker, isStart in d.historyMarkers:
             if not isStart:    # This is an end of history marker, but we are not in history, so skip this marker
                 continue
-            logging.debug('Checking inHistory marker:%s[%s]', marker.pattern, marker.flags)
+            # logging.debug('Checking inHistory marker:%s[%s]', marker.pattern, marker.flags)
             match = marker.search(text)
             if match is not None:    # Start of history found
                 historyFound = True        # Start of history marker found
@@ -177,14 +177,14 @@ def checkHistory(inHistory, text, depth):
                     newStart = match.start()
                     matchLen = len(match.group())
         if historyFound:        # We did bounce into history
-            logging.debug('checkHistory() - history found at %d with text "%s"', newStart, text[newStart:newStart + matchLen])
+            # logging.debug('checkHistory() - history found at %d with text "%s"', newStart, text[newStart:newStart + matchLen])
             return newStart, matchLen
         # We aren't in history, or at least we don't think we are - the specific solution may have a different answer
         historyAt, scChangeAt, scLen = d.sc.solutionCheckHistory(inHistory, text)
         # The solution can indicate that history started at a previous sentence
         # All sentences between this new start of history and the current sentence are history
         if historyAt == 0:            # History starts with this sentence
-            logging.debug('checkHistory() - solution say history started at the start of this sentence')
+            # logging.debug('checkHistory() - solution say history started at the start of this sentence')
             return scChangeAt, scLen
         elif historyAt > 0:            # History starts at a previous sentence
             # History started several sentences ago - update those sentences to history
@@ -194,7 +194,7 @@ def checkHistory(inHistory, text, depth):
                 logging.critical('Too many levels of recursion when checking history')
                 logging.shutdown()
                 sys.exit(d.EX_CONFIG)
-            logging.debug('checkHistory() - solution says history started %d sentences ago', historyAt)
+            # logging.debug('checkHistory() - solution says history started %d sentences ago', historyAt)
             thisHistory = True
             for fixIt in range(0, historyAt):
                 d.sentences[-1 - fixIt][0] = False        # Has no history changes
@@ -233,7 +233,7 @@ def checkHistory(inHistory, text, depth):
                         startHistory = match.start()
                         matchLen = len(match.group())
             if startHistory is not None:
-                logging.debug('checkHistory() - found a pre-history tag at %d', startHistory)
+                # logging.debug('checkHistory() - found a pre-history tag at %d', startHistory)
                 return startHistory, matchLen
         return None, None
 
@@ -256,7 +256,7 @@ def checkNegation(concept, text, start, sentenceNo, isNeg):
         prePost     - str, the name of the name of the data set of patterns containing reason
     '''
 
-    logging.debug('looking for negation of %s[%s] in %s', text, isNeg, d.sentences[sentenceNo][4])
+    # logging.debug('looking for negation of %s[%s] in %s', text, isNeg, d.sentences[sentenceNo][4])
     changeIt = '0'
     changeAt = -1
     reason = ''
@@ -269,7 +269,7 @@ def checkNegation(concept, text, start, sentenceNo, isNeg):
     butBefore = None
     butAfter = None
     for butBoundary in d.butBoundaries:
-        logging.debug('looking for butBoundary (%s)', butBoundary.pattern)
+        # logging.debug('looking for butBoundary (%s)', butBoundary.pattern)
         match = butBoundary.search(d.sentences[sentenceNo][4])
         if match is not None:
             if match.start() < thisStart:
@@ -278,7 +278,7 @@ def checkNegation(concept, text, start, sentenceNo, isNeg):
             elif match.start() > thisStart:
                 if (butAfter is None) or (butAfter > match.start()):
                     butAfter = match.start()
-                logging.debug('found butBoundary (%s) at %d', butBoundary, match.start())
+                # logging.debug('found butBoundary (%s) at %d', butBoundary, match.start())
     # Truncate the sentence text if there are any but boundaries
     if butBefore is None:
         if butAfter is None:
@@ -301,52 +301,52 @@ def checkNegation(concept, text, start, sentenceNo, isNeg):
         for preNegate in d.preNegation:
             if (len(preNegate) > 1) and (concept not in preNegate[1:]):        # Check if this negation is limited to a list of concepts
                 continue
-            logging.debug('looking for preNegation of (%s) in (%s)', preNegate[0].pattern, thisText[:thisStart])
+            # logging.debug('looking for preNegation of (%s) in (%s)', preNegate[0].pattern, thisText[:thisStart])
             for match in preNegate[0].finditer(thisText[:thisStart]):
                 if match.start() > changeAt:
                     changeAt = match.start()
                     changeIt = '1'
                     reason = preNegate[0].pattern
                     prePost = 'preNegation'
-                    logging.debug('found preNegation(%s) at %d', reason, changeAt)
+                    # logging.debug('found preNegation(%s) at %d', reason, changeAt)
         for immedPreNegate in d.immediatePreNegation:
             if (len(immedPreNegate) > 1) and (concept not in immedPreNegate[1:]):        # Check if this negation is limited to a list of concepts
                 continue
-            logging.debug('looking for immediatePreNegation of (%s) in (%s)', immedPreNegate[0].pattern, thisText[:thisStart])
+            # logging.debug('looking for immediatePreNegation of (%s) in (%s)', immedPreNegate[0].pattern, thisText[:thisStart])
             for match in immedPreNegate[0].finditer(thisText[:thisStart]):
                 if match.start() > changeAt:
                     changeAt = match.start()
                     changeIt = '1'
                     reason = immedPreNegate[0].pattern
                     prePost = 'immediatePreNegation'
-                    logging.debug('found immediatePreNegation (%s) at %d', reason, changeAt)
+                    # logging.debug('found immediatePreNegation (%s) at %d', reason, changeAt)
     for immedPreAmbig in d.immediatePreAmbiguous:
         if (len(immedPreAmbig) > 1) and (concept not in immedPreAmbig[1:]):        # Check if this ambiguity is limited to a list of concepts
             continue
-        logging.debug('looking for immediate preAmbiguous of (%s) in (%s)', immedPreAmbig[0].pattern, thisText[:thisStart + len(text)])
+        # logging.debug('looking for immediate preAmbiguous of (%s) in (%s)', immedPreAmbig[0].pattern, thisText[:thisStart + len(text)])
         for match in immedPreAmbig[0].finditer(thisText[:thisStart]):
             if match.start() > changeAt:
                 changeAt = match.start()
                 changeIt = '2'
                 reason = immedPreAmbig[0].pattern
                 prePost = 'immediatePreAmbiguous'
-                logging.debug('found immediatePreAmbiguous(%s) at %d', reason, changeAt)
+                # logging.debug('found immediatePreAmbiguous(%s) at %d', reason, changeAt)
     for preAmbig in d.preAmbiguous:
         if (len(preAmbig) > 1) and (concept not in preAmbig[1:]):        # Check if this ambiguity is limited to a list of concepts
             continue
-        logging.debug('looking for preAmbiguous of (%s) in (%s)', preAmbig[0].pattern, thisText[:thisStart + len(text)])
+        # logging.debug('looking for preAmbiguous of (%s) in (%s)', preAmbig[0].pattern, thisText[:thisStart + len(text)])
         for match in preAmbig[0].finditer(thisText[:thisStart]):
             if match.start() > changeAt:
                 changeAt = match.start()
                 changeIt = '2'
                 reason = preAmbig[0].pattern
                 prePost = 'preAmbiguous'
-                logging.debug('found preAmbiguous(%s) at %d', reason, changeAt)
+                # logging.debug('found preAmbiguous(%s) at %d', reason, changeAt)
     if changeIt == '0':
         # No preNegate or preAmbiguous, so try postNegate and postAmbiguous
         changeAt = len(d.sentences[sentenceNo][4]) + 1
         for postAmbig, exceptAmbig in d.postAmbiguous:
-            logging.debug('looking for postAmbigous of (%s) in (%s)', postAmbig.pattern, thisText[thisStart:])
+            # logging.debug('looking for postAmbigous of (%s) in (%s)', postAmbig.pattern, thisText[thisStart:])
             for match in postAmbig.finditer(thisText[thisEnd:]):
                 if exceptAmbig is not None:
                     exceptMatch = exceptAmbig.search(thisText[thisEnd:])
@@ -357,9 +357,9 @@ def checkNegation(concept, text, start, sentenceNo, isNeg):
                     changeIt = '2'
                     reason = postAmbig.pattern
                     prePost = 'postAmbiguous'
-                    logging.debug('found postAmbigous(%s) at %d', postAmbig[0].pattern, changeAt)
+                    # logging.debug('found postAmbigous(%s) at %d', postAmbig[0].pattern, changeAt)
         for immedPostAmbig, exceptAmbig in d.immediatePostAmbiguous:
-            logging.debug('looking for immediate postAmbigous of (%s) in (%s)', immedPostAmbig.pattern, thisText[thisStart:])
+            # logging.debug('looking for immediate postAmbigous of (%s) in (%s)', immedPostAmbig.pattern, thisText[thisStart:])
             for match in immedPostAmbig.finditer(thisText[thisEnd:]):
                 if exceptAmbig is not None:
                     exceptMatch = immedPostAmbig[1].search(thisText[thisEnd:])
@@ -370,10 +370,10 @@ def checkNegation(concept, text, start, sentenceNo, isNeg):
                     changeIt = '2'
                     reason = immedPostAmbig.pattern
                     prePost = 'immediatePostAmbiguous'
-                    logging.debug('found immediatePostAmbigous(%s) at %d', immedPostAmbig[0].pattern, changeAt)
+                    # logging.debug('found immediatePostAmbigous(%s) at %d', immedPostAmbig[0].pattern, changeAt)
         if isNeg != '1':        # Don't look for negation of already negated
             for postNegate, exceptNegate in d.postNegation:
-                logging.debug('looking for postNegation of (%s) in (%s)', postNegate.pattern, thisText[thisStart:])
+                # logging.debug('looking for postNegation of (%s) in (%s)', postNegate.pattern, thisText[thisStart:])
                 for match in postNegate.finditer(thisText[thisEnd:]):
                     if exceptNegate is not None:
                         exceptMatch = exceptNegate.search(thisText[thisEnd:])
@@ -384,9 +384,9 @@ def checkNegation(concept, text, start, sentenceNo, isNeg):
                         changeIt = '1'
                         reason = postNegate[0].pattern
                         prePost = 'postNegation'
-                        logging.debug('found postNegation(%s) at %d', postNegate[0].pattern, changeAt)
+                        # logging.debug('found postNegation(%s) at %d', postNegate[0].pattern, changeAt)
             for immedPostNegate, exceptNegate in d.immediatePostNegation:
-                logging.debug('looking for immediatePostNegation of (%s) in (%s)', immedPostNegate.pattern, thisText[thisStart:])
+                # logging.debug('looking for immediatePostNegation of (%s) in (%s)', immedPostNegate.pattern, thisText[thisStart:])
                 for match in immedPostNegate.finditer(thisText[thisEnd:]):
                     if exceptNegate is not None:
                         exceptMatch = exceptNegate.search(thisText[thisEnd:])
@@ -397,7 +397,7 @@ def checkNegation(concept, text, start, sentenceNo, isNeg):
                         changeIt = '1'
                         reason = immedPostNegate[0].pattern
                         prePost = 'immediatePostNegation'
-                        logging.debug('found immediatePostNegation (%s) at %d', immedPostNegate[0].pattern, changeAt)
+                        # logging.debug('found immediatePostNegation (%s) at %d', immedPostNegate[0].pattern, changeAt)
     return (changeIt, reason, prePost)
 
 
@@ -474,7 +474,7 @@ def checkSets(history):
 
     # check each sentence concept sequence set
     for setNo, (higherConcept, thisSet, isStrict, sentenceRange, higherConceptNegated, asserted) in enumerate(d.sentenceConceptSequenceSets):
-        logging.debug('Checking sentence Concept Sequence set (%s) [%s]', d.sentenceConceptSequenceSets[setNo], history)
+        # logging.debug('Checking sentence Concept Sequence set (%s) [%s]', d.sentenceConceptSequenceSets[setNo], history)
         if len(thisSet) == 0:       # Empty concept list
             continue
         conceptNo = 0           # The index of the next concept in the sequence set
@@ -482,7 +482,7 @@ def checkSets(history):
         concept, isNeg = thisSet[conceptNo]     # The next concept that we are looking for
         firstConcept, firstIsNeg = thisSet[0]
         for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
-            logging.debug('checkSets - sentence Concept (Strict) (Sequence) Sets - processing sentence[%d]', sentenceNo)
+            # logging.debug('checkSets - sentence Concept (Strict) (Sequence) Sets - processing sentence[%d]', sentenceNo)
             document = sentence[6]        # Sentences hold mini-documents
             if len(conceptList) == 0:        # Compute a new 'valid range' if still looking for the first concept
                 # Compute the last sentence for this range
@@ -533,14 +533,14 @@ def checkSets(history):
                             conceptList.append((sentenceNo, thisStart, jj))        # Add to the list of things we may need to mark as 'used'
                             conceptNo = 1
                             conceptFound = True
-                            logging.debug('concept(%s[%s]) is not the next concept (%s[%s]) in set[%d], but is the first - restarting',
-                                            thisConcept, thisIsNeg, concept, isNeg, setNo)
+                            # logging.debug('concept(%s[%s]) is not the next concept (%s[%s]) in set[%d], but is the first - restarting',
+                            #                 thisConcept, thisIsNeg, concept, isNeg, setNo)
                             break   # Proceed to next 'start' in this sentence
                         continue
                     # We have the next concept from this set
                     conceptFound = True
                     conceptList.append((sentenceNo, thisStart, jj))        # Add to the list of things we may need to mark as 'used'
-                    logging.debug('Concept (%s) [for sentence Concept (Strict) (Sequence) set:%d] found', thisConcept, setNo)
+                    # logging.debug('Concept (%s) [for sentence Concept (Strict) (Sequence) set:%d] found', thisConcept, setNo)
                     conceptNo += 1
                     if len(conceptList) == len(thisSet):
                         # We have a full concept (strict) (sequence) set - so save the higher concept - append the higher concept to the list of alternates
@@ -555,7 +555,7 @@ def checkSets(history):
                                 # Check if we should mark this concepts in the concept list as used
                                 if asserted or (d.sc.setConcept(higherConcept, foundConcept)):
                                     d.sentences[sno][6][strt][k]['used'] = True
-                                    logging.debug('Marking sentence concept sequence set item at %d/%d as used', strt, k)
+                                    # logging.debug('Marking sentence concept sequence set item at %d/%d as used', strt, k)
 
                         conceptNo = 0        # Restart in case the same concept sequence set exists later in the sentences
                         conceptList = []
@@ -593,7 +593,7 @@ def checkSets(history):
     # Sentence Concept Sets can be valid over a number of sentences, but we may have to expire things found if we go beyond that range
     # (SolutionID, [(concept, isNeg)], sentences, isNeg, asserted)
     for setNo, (higherConcept, thisSet, sentenceRange, higherConceptNegated, asserted) in enumerate(d.sentenceConceptSets):
-        logging.debug('Checking sentence Concept set (%s) [%s]', d.sentenceConceptSets[setNo], history)
+        # logging.debug('Checking sentence Concept set (%s) [%s]', d.sentenceConceptSets[setNo], history)
         if len(thisSet) == 0:       # Empty concept list
             continue
         toFindCount = {}        # The count of the number of times each concept/negation occurs in this set
@@ -604,7 +604,7 @@ def checkSets(history):
                 toFindCount[(concept, isNeg)] += 1
         conceptList = []        # The concepts in this set that have been found
         for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
-            logging.debug('checkSets - sentence Concept Sets - processing sentence[%d]', sentenceNo)
+            # logging.debug('checkSets - sentence Concept Sets - processing sentence[%d]', sentenceNo)
             document = sentence[6]        # Sentences hold mini-documents
             if len(conceptList) == 0:        # Compute a new 'valid range' if still looking for the first concept
                 # Compute the last sentence for this range
@@ -636,7 +636,7 @@ def checkSets(history):
                         continue
                     toFindCount[(thisConcept, thisIsNeg)] -= 1
                     conceptList.append((sentenceNo, thisStart, jj))        # Add to the list of things we may need to mark as 'used'
-                    logging.debug('Concept (%s) [for sentence Concept set:%d] found', thisConcept, setNo)
+                    # logging.debug('Concept (%s) [for sentence Concept set:%d] found', thisConcept, setNo)
                     if len(conceptList) == len(thisSet):
                         # We have a full concept set - so save the higher concept - append the higher concept to the list of alternates
                         logging.info('Sentence concept set (%s:%s) found', higherConcept, thisSet)
@@ -650,7 +650,7 @@ def checkSets(history):
                                 # Check if we should mark this concepts in the concept list as used
                                 if asserted or (d.sc.setConcept(higherConcept, foundConcept)):
                                     d.sentences[sno][6][strt][k]['used'] = True
-                                    logging.debug('Marking sentence concept sequence set item at %d/%d as used', strt, k)
+                                    # logging.debug('Marking sentence concept sequence set item at %d/%d as used', strt, k)
 
                         # Restart in case the same concept sequence set exists later in the sentences
                         toFindCount = {}        # The count of the number of times each concept/negation occurs in this set
@@ -680,13 +680,13 @@ def checkSets(history):
     # check each document concept sequence set
     for setNo, (higherConcept, thisSet, sentenceRange, higherConceptNegated, asserted) in enumerate(d.documentConceptSequenceSets):
         # sentenceRange will be '1' and should be ignored, as this is a whole of document check
-        logging.debug('Checking document concept sequence set (%s)', d.documentConceptSequenceSets[setNo])
+        # logging.debug('Checking document concept sequence set (%s)', d.documentConceptSequenceSets[setNo])
         conceptNo = 0                # Check each concept in the set in sequence
         conceptList = []            # And remember which one's we've found so we can mark them as used if we get a full set
         concept, isNeg = thisSet[conceptNo]     # The next concept that we are looking for
         firstConcept, firstIsNeg = thisSet[0]
         for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
-            logging.debug('checkSets - document Concept Sequence Sets - processing sentence[%d]', sentenceNo)
+            # logging.debug('checkSets - document Concept Sequence Sets - processing sentence[%d]', sentenceNo)
             document = sentence[6]    # Sentences hold mini-documents
             for thisStart in sorted(document, key=int):
                 conceptFound = False                    # Concept in theSet at 'conceptNo' not yet found at thisStart
@@ -726,14 +726,14 @@ def checkSets(history):
                             conceptList.append((sentenceNo, thisStart, jj))        # Add to the list of things we may need to mark as 'used'
                             conceptNo = 1
                             conceptFound = True
-                            logging.debug('concept(%s[%s]) is not the next concept (%s[%s]) in set[%d], but is the first - restarting',
-                                            thisConcept, thisIsNeg, concept, isNeg, setNo)
+                            # logging.debug('concept(%s[%s]) is not the next concept (%s[%s]) in set[%d], but is the first - restarting',
+                            #                 thisConcept, thisIsNeg, concept, isNeg, setNo)
                             break   # Proceed to next 'start' in this sentence
                         continue
                     # We have the next concept from this set
                     conceptFound = True
                     conceptList.append((sentenceNo, thisStart, jj))        # Add to the list of things we may need to mark as 'used'
-                    logging.debug('Concept (%s) [for document Concept Sequence set:%d] found', thisConcept, setNo)
+                    # logging.debug('Concept (%s) [for document Concept Sequence set:%d] found', thisConcept, setNo)
                     if conceptNo == len(thisSet):
                         # We have a full set - so save the higher concept
                         logging.info('Document concept Sequence set (%s:%s) found', higherConcept, thisSet)
@@ -750,7 +750,7 @@ def checkSets(history):
                                 # Check if we should mark this concepts in the concept list as used
                                 if asserted or (d.sc.setConcept(higherConcept, foundConcept)):
                                     d.sentences[sno][6][strt][k]['used'] = True
-                                logging.debug('Marking document concept Sequence set item at %d/%d as used', strt, k)
+                                # logging.debug('Marking document concept Sequence set item at %d/%d as used', strt, k)
                         conceptNo = 0        # Restart in case the same concept sequence set exists later in the sentences
                         conceptList = []
                         # Compute the last sentence for this range
@@ -770,7 +770,7 @@ def checkSets(history):
     # Now check for any Document Concept Sets - checking across all sentences
     for setNo, (higherConcept, thisSet, sentenceRange, higherConceptNegated, asserted) in enumerate(d.documentConceptSets):
         # sentenceRange will be '1' and should be ignored, as this is a whole of document check
-        logging.debug('Checking document Concept set (%s) [%s]', d.documentConceptSets[setNo], history)
+        # logging.debug('Checking document Concept set (%s) [%s]', d.documentConceptSets[setNo], history)
         if len(thisSet) == 0:       # Empty concept list
             continue
         toFindCount = {}        # The count of the number of times each concept/negation occurs in this set
@@ -781,7 +781,7 @@ def checkSets(history):
                 toFindCount[(concept, isNeg)] += 1
         conceptList = []        # The concepts in this set that have been found
         for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
-            logging.debug('checkSets - document Concept Sets - processing sentence[%d]', sentenceNo)
+            # logging.debug('checkSets - document Concept Sets - processing sentence[%d]', sentenceNo)
             document = sentence[6]        # Sentences hold mini-documents
             for thisStart in sorted(document, key=int):        # We step through all concepts in each sentence
                 for jj, miniDoc in enumerate(document[thisStart]):    # Step through the list of alternate concepts at this point in this sentence
@@ -805,7 +805,7 @@ def checkSets(history):
                         continue
                     toFindCount[(thisConcept, thisIsNeg)] -= 1
                     conceptList.append((sentenceNo, thisStart, jj))        # Add to the list of things we may need to mark as 'used'
-                    logging.debug('Concept (%s) [for document Concept set:%d] found', thisConcept, setNo)
+                    # logging.debug('Concept (%s) [for document Concept set:%d] found', thisConcept, setNo)
                     if len(conceptList) == len(thisSet):
                         # We have a full concept set - so save the higher concept - append the higher concept to the list of alternates
                         logging.info('Sentence concept set (%s:%s) found', higherConcept, thisSet)
@@ -819,7 +819,7 @@ def checkSets(history):
                                 # Check if we should mark this concepts in the concept list as used
                                 if asserted or (d.sc.setConcept(higherConcept, foundConcept)):
                                     d.sentences[sno][6][strt][k]['used'] = True
-                                    logging.debug('Marking sentence concept sequence set item at %d/%d as used', strt, k)
+                                    # logging.debug('Marking sentence concept sequence set item at %d/%d as used', strt, k)
 
                         # Restart in case the same concept sequence set exists later in the sentences
                         toFindCount = {}        # The count of the number of times each concept/negation occurs in this set

@@ -1,0 +1,29 @@
+ CLINICAL            Abnormal bleeding      DUB.      Irreg cycle.     Previous  
+ INFORMATION:        pap ? HSIL. Pipelle - Histol,     Co- Test.                
+                                                                                
+ MACROSCOPIC:        Specimen labelled with name only. The specimen consists of 
+                     a small amount of curetted tissue, 20x15x4mm in total. All 
+                     embedded. RM/rm.                                           
+                                                                                
+                                                                                
+                                                                                
+ MICROSCOPIC         The endometrial glands are secretory in type.  The stroma  
+ DESCRIPTION:        is compact. There is no evidence of chronic endometritis,  
+                     endometrial atypia, hyperplasia or malignancy.             
+                                                                                
+                                                                                
+                                                                                
+ DIAGNOSIS:          Endometrial curettings: Secretory endometrium.             
+                                                                                
+                     SNOMED II Code: T84000, M79320                             
+                                                                                
+                                                                                
+                                                                                
+ REPORTED BY:        Dr Russell McDonell                                             
+                                                                                
+                                                                                
+                                                                                
+                     End of Report                                              
+Validated by rmcdonell 10:08 22 Jan 2018
+
+

@@ -46,14 +46,14 @@ def requireConcept(concept, isNegated, partOfSpeech, isHistory, sentenceNo, star
         isRequired      - boolean, True means that this concept is required
     '''
 
-    logging.debug('requireConcept:%s, %s, %s, %s, %d, %d, %d, %s', concept, isNegated, partOfSpeech, isHistory, sentenceNo, start, length, text)
+    # logging.debug('requireConcept:%s, %s, %s, %s, %d, %d, %d, %s', concept, isNegated, partOfSpeech, isHistory, sentenceNo, start, length, text)
 
     if partOfSpeech in ['NN', 'NNP', 'NNS', 'NNPS', 'JJ', 'JJR', 'JJS', 'RB', 'RBR', 'RBS']:
-        logging.debug('noun, adjective or adverb at %d[%s]', start, text)
+        # logging.debug('noun, adjective or adverb at %d[%s]', start, text)
         # Check if this is just a question, not an answer - the ? will always be the last character on the previous line
         if sentenceNo > 0:        # Start by looking for ' ? xxxx'
             if re.search(r'\s\?\s*$', d.sentences[sentenceNo - 1][4], flags=re.IGNORECASE) is not None:
-                logging.debug('requiredConcept:ignored as query term')
+                # logging.debug('requiredConcept:ignored as query term')
                 return False
     return True
 
@@ -82,25 +82,20 @@ def solutionCheckHistory(inHistory, text):
         return (-1, None, None)
     else:                # We are not in history - check to see if that we have fallen into a new history section
         # Checking if this sentence contains 'INFORMATION:' and any of the three previous sentences starts with 'CLINICAL'
-        logging.debug('solutionCheckHistory() - searching through sentences %s', d.sentences)
+        # logging.debug('solutionCheckHistory() - searching through sentences %s', d.sentences)
         clinicalFound = -1
         search = re.search(r'\b' + r'INFORMATION\s*:', text)
         if search is not None:      # We have 'INFORMATION' in the current sentence in d.sentences
             clinicalFound = -1      # Now search previous sentence for 'CLINICAL'
             if (len(d.sentences) == 0) and (re.search(r'^\s*CLINICAL', text) is not None):
-                logging.debug('solutionCheckHistory() - found CLINICAL in  this text(%s)', text)
                 clinicalFound = 0
             if (len(d.sentences) > 0) and (re.search(r'^\s*CLINICAL', d.sentences[-1][4]) is not None):
-                logging.debug('solutionCheckHistory() - found CLINICAL in sentence[-1](%s)', d.sentences[-1][4])
                 clinicalFound = 1
             if (len(d.sentences) > 1) and (re.search(r'^\s*CLINICAL', d.sentences[-2][4]) is not None):
-                logging.debug('solutionCheckHistory() - found CLINICAL in sentence[-2](%s)', d.sentences[-2][4])
                 clinicalFound = 2
             if (len(d.sentences) > 2) and (re.search(r'^\s*CLINICAL', d.sentences[-3][4]) is not None):
-                logging.debug('solutionCheckHistory() - found CLINICAL in sentence[-3](%s)', d.sentences[-3][4])
                 clinicalFound = 3
             if (len(d.sentences) > 3) and (re.search(r'^\s*CLINICAL', d.sentences[-4][4]) is not None):
-                logging.debug('solutionCheckHistory() - found CLINICAL in sentence[-4](%s)', d.sentences[-4][4])
                 clinicalFound = 4
         if clinicalFound == -1:
             return (-1, None, None)
@@ -146,7 +141,7 @@ def solutionAddAdditionalConcept(concept, sentenceNo, start, j, negated, depth):
 
     # Check if this concept has an implied diagnosis
     if concept in d.sd.DiagnosisImplied:
-        logging.debug('%s is in diagnosisImplied', concept)
+        # logging.debug('%s is in diagnosisImplied', concept)
         for thisSite, thisFinding in d.sd.DiagnosisImplied[concept]:
             # There is an implied Site so we add it to the document
             description = d.sd.Site[thisSite]['desc']
@@ -215,7 +210,7 @@ def extendNegation(sentenceNo, start, lastNegation, thisNegation):
         Nothing
     '''
 
-    logging.debug('extendNegation:%d, %d, %s, %s', sentenceNo, start, lastNegation, thisNegation)
+    # logging.debug('extendNegation:%d, %d, %s, %s', sentenceNo, start, lastNegation, thisNegation)
 
     # Don't extend negation at the start of a sentence or if we have just crossed a but boundary
     if lastNegation is None:
@@ -327,7 +322,7 @@ def addFinalConcepts():
 
                 # Check if this concept has an implied diagnosis
                 if concept in d.sd.DiagnosisImplied:
-                    logging.debug('%s is in diagnosisImplied', concept)
+                    # logging.debug('%s is in diagnosisImplied', concept)
                     for thisSite, thisFinding in d.sd.DiagnosisImplied[concept]:
                         # There is an implied Site so we add it to the document
                         description = d.sd.Site[thisSite]['desc']

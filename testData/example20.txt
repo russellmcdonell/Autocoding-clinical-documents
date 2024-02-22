@@ -1,0 +1,63 @@
+HISTOLOGY REPORT
+----------------
+SPECIMEN NUMBER: 2018A000207
+
+SITE: CERVICAL BIOPSY.
+
+CLINICAL NOTES:
+Cervical biopsy.
+
+MACROSCOPIC:
+(Cx. Bx.).
+The specimen consists of two greyish white biopsies, 4mm x 3mm x 2mm
+and 4mm x 3mm x 2mm. All embedded in one block. (RM:rm)
+
+MICROSCOPIC:
+RCPA structured  reporting for  excisions and  colposcopic biopsies
+for pre-invasive cervical neoplasia
+
+Microscopic description:  Sections show two  cervical biopsies lined
+by squamous and endocervical mucosa and underlying stroma containing
+endocervical  glands. The squamous  epithelium shows  involvement by
+high-grade squamous intra-epithelial  lesion (CIN 3) and HPV effect.
+The CIN  3 focally   extends  down the   endocervical  glands.   The
+keratinocytes are disorganised, the nuclei are markedly enlarged and
+there is  marked  variation   nuclear size  and  shape. The  nuclear
+membranes  are irregular  and the  chromatin  is granular.   Mitotic
+figures are identified within the  epithelium.  There is no invasive
+malignancy.   There is  no glandular  atypia.  There is  patchy mild
+chronic cervicitis present.
+
+Tissues present:  Ectocervical,  endocervical mucosa  and underlying
+stroma.
+
+SCJ included in specimen: Present.
+
+High-grade Squamous Intraepithelial Lesion Present.
+      HSIL subtype: CIN 3.
+      Extent: Focal.
+
+AIS: Not seen.
+
+Stratified Mucin-producing Intraepithelial Lesion (SMILE): Not seen.
+
+Low-grade Squamous Intraepithelial Lesion: Present.
+
+Margins for pre-invasive disease N/A.
+
+Other pathology: Mild patchy chronic cervicitis.
+
+Ancillary studies
+      HR HPV: other detected.
+      P16: Not performed.
+
+DIAGNOSIS:
+Cervical biopsy: HIGH-GRADE SQUAMOUS  INTRAEPITHELIAL LESION (CIN 3)
+AND HPV EFFECT. No invasive malignancy. (RM:ram)
+
+
+SNOMED: T83000-M67017 M69790
+
+ELECTRONICALLY AUTHORISED BY: Dr R McDonell checked by Dr R McDonell,Cervical biopsy: HIGH-GRADE SQUAMOUS  INTRAEPITHELIAL LESION (CIN 3) 
+AND HPV EFFECT. No invasive malignancy. (RM:ram)
+

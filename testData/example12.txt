@@ -1,0 +1,60 @@
+Histopathology Consultation
+Request details
+
+Clinical  Notes:  HPV  other  type  (non-16/18).  LBL  -  LSIL.  No endocervical
+component. Histopathology. LEEP - stitch at 12 o'clock.
+Previous biopsies: None.
+MACROSCOPIC FINDINGS:
+Pot  labelled:  'LEEP stitch   12 o'clock'. An excision of cervix 14 mm right to
+left  by  14  mm  anterior  to  posterior by 12 mm in length, with a smooth pale
+ectocervix with small scattered pinpoint haemorrhages. The cores is not patient.
+Specimen  is oriented with a suture at 12:00, with 3?12?9:00 inked blue 9?6?3:00
+inked black.
+A - 3 o'clock margin, B-E - sections 3 to 9 o'clock, F - 9 o'clock section. A6.
+SRT.
+MICROSCOPIC FINDINGS:
+All  of  the  tissue  has  been embedded in serial sections.  A minimum of three
+levels have been examined from each block.
+Sections   show   reactive  and  regenerative  changes  in  squamous  epithelium
+surrounding the external os. In several areas, features suggest HPV infection,
+however  definite  dysplasia  is not seen. Unfortunately, much of the epithelium
+covering  the  posterior  lip  has been denuded. A moderate chronic inflammatory
+infiltrate  is  present  within  the  underlying  stroma.  The epithelium of the
+endocervical  canal  appears unremarkable. No evidence of glandular neoplasia is
+seen.
+DIAGNOSIS:
+
+ LEEP cone biopsy                    Reactive and regenerative changes in
+ of cervix.                          squamous epithelium around the external
+                                     os.
+                                     Features suggest HPV infection but
+                                     definite dysplasia is not seen.
+                                     Moderate chronic cervicitis.
+
+
+Dr Russell McDonell (Provider No. 0194059B)
+SYNOPTIC SUMMARY
+SPECIMEN:  LEEP
+NUMBER OF PIECES: One
+DIMENSIONS:
+Ectocervix:   14x14mm
+Length:   12mm
+SQUAMOUS EPITHELIUM: LSIL
+Subtype: HPV
+GLANDULAR EPITHELIUM: Normal
+MUCOSAL MARGINS:
+Ectocervical nearest margin    ?mm
+Endocervical nearest margin  12 mm
+STROMAL MARGINS: Clear
+TISSUE ARTEFACT: Absent
+Type:  N/A
+Degree: N/A
+DEGREE OF EPITHELIAL LOSS:
+Moderate-extensive
+Extensive impacting diagnostic assessment a
+ANCILLARY TESTS: Not Performed
+ADDITIONAL  COMMENT:  Much of the epithelium covering the posterior lip has been
+denuded.
+
+t-83000,m-76720
+

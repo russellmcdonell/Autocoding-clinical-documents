@@ -145,7 +145,10 @@ def loadSimpleSheet(wb, workbook, sheet, columns):
 
 def loadSimpleDictionarySheet(wb, workbook, sheet, columns, skip):
     '''
-    Load worksheet as a dictionary {key: column 1 value, value: (list of) values from remaining columns}
+    Load worksheet as a dictionary
+        {key: column 1 value,
+         value: If there are only two columns, then the value in the second column}
+                If more than two columns, then list of values from remaining columns}
     Parameters
         wb              - an openpyxl workbook containing configuration data
         workbookName    - str, the name of the workbook/part of the solution
@@ -162,7 +165,10 @@ def loadSimpleDictionarySheet(wb, workbook, sheet, columns, skip):
         if record[0] is None:
             break
         # logging.debug("workbook(%s), sheet(%s), columns(%s), record(%s)", workbook, sheet, columns, record)
-        target[record[0]] = record[1 + skip:]
+        if (1 + skip) == (len(columns) - 1):
+            target[record[0]] = record[1 + skip]
+        else:
+            target[record[0]] = record[1 + skip:]
     return target
 
 
@@ -186,7 +192,7 @@ def loadDictionaryDictionarySheet(wb, workbook, sheet, columns):
     target = {}
     newColumns = cleanColumnHeadings(columns)
     for row in this_df.itertuples(index=False):
-        logging.debug("workbook(%s) sheet(%s), columns(%s), row(%s)", workbook, sheet, columns, row)
+        # logging.debug("workbook(%s) sheet(%s), columns(%s), row(%s)", workbook, sheet, columns, row)
         thisKey = row[0]
         target[thisKey] = {}
         if len(columns) == 2:
@@ -303,7 +309,7 @@ def loadBoolCompileWorksheet(wb, workbook, sheet, columns, pretext, posttext, do
     for record in thisData:
         if record[0] is None:
             break
-        logging.debug("workbook(%s), sheet(%s), columns(%s), record(%s)", workbook, sheet, columns, record)
+        # logging.debug("workbook(%s), sheet(%s), columns(%s), record(%s)", workbook, sheet, columns, record)
         reText = checkPattern(record[0])
         if pretext is not None:
             reText = pretext + reText

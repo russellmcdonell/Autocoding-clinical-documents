@@ -1,0 +1,133 @@
+openapi: 3.0.1
+info:
+  title: AutoCode a clinical document
+  description: AutoCode a clinical document
+  contact:
+    email: russell.mcdonell@c-cost.com
+  version: 1.0.0
+servers:
+  - url: localhost:5000/
+paths:
+  /:
+    post:
+      summary: AutoCode a clinical document
+      description: AutoCode a clinical document
+      operationId: AutoCode
+      requestBody:
+        description: document
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/clinicalDocument'
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/results'
+components:
+  schemas:
+    clinicalDocument:
+      type: object
+      properties:
+        document:
+          type: string
+          example: "nothing found"
+      required:
+        - document
+    results:
+      type: object
+      properties:
+        SCTprocedure:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "5925593"
+            desc:
+              type: string
+              example: "hysterectomy"
+        grid:
+          type: array
+          items:
+            type: object
+            properties:
+              site:
+                type: string
+                example: "1959902"
+              "site description":
+                type: string
+                example: "Cervix"
+              finding:
+                type: string
+                example: "23695903"
+              "finding description":
+                type: string
+                example: "Carcinoma"
+              AIHW:
+                type: string
+                example: "S3.1"
+        AIHWprocedure:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "9"
+            desc:
+              type: string
+              example: "Hysterectomy"
+        S:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "S1"
+            desc:
+              type: string
+              example: "Negative"
+        E:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "E1"
+            desc:
+              type: string
+              example: "Negative"
+        O:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "O1"
+            desc:
+              type: string
+              example: "Negative"
+        OtherHysterectomies:
+          type: array
+            items:
+              type: array
+              items:
+                type: string
+                example: "86273004"
+                type: string
+                example: "Biopsy"
+                type: string
+                example: "1"
+                type: string
+                example: "Punch biopsy"
+        OtherProcedures:
+          type: array
+            items:
+              type: array
+              items:
+                type: string
+                example: "86273004"
+                type: string
+                example: "Biopsy"
+                type: string
+                example: "1"
+                type: string
+                example: "Punch biopsy"

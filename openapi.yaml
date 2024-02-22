@@ -1,0 +1,41 @@
+openapi: 3.0.1
+info:
+  title: AutoCode a clinical document
+  description: AutoCode a clinical document
+  contact:
+    email: russell.mcdonell@c-cost.com
+  version: 1.0.0
+servers:
+  - url: localhost:5000/
+paths:
+  /:
+    post:
+      summary: AutoCode a clinical document
+      description: AutoCode a clinical document
+      operationId: AutoCode
+      requestBody:
+        description: document
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/clinicalDocument'
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/results'
+components:
+  schemas:
+    clinicalDocument:
+      type: object
+      properties:
+        document:
+          type: string
+          example: "nothing found"
+      required:
+        - document
+    results:
+

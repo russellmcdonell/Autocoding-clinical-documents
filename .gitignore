@@ -1,7 +1,6 @@
 *.ipynb
 *.pyc
 *.swp
-testData/*
 testOutput/*
 logs/*
 tmp/*

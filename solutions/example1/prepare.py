@@ -8,7 +8,6 @@ This is the example solution 1 - histopathology autocoding
 import sys
 import logging
 import re
-import functions as f
 import excelFunctions as excel
 import data as d
 
@@ -153,7 +152,7 @@ def solutionCheckPreamble(text):
         at      - int, location within text where preamble located, or -1 if no preamble located
     '''
 
-    logging.debug('Checking for preabmle in "%s"', text)
+    # logging.debug('Checking for preabmle in "%s"', text)
 
     # Start by spliting the document into lines
     lines = text.split('\n')
@@ -180,6 +179,6 @@ def solutionCheckNotPreamble(text):
         at      - int, location within text where end of preamble located, or -1 if no end of preamble located
     '''
 
-    logging.debug('Checking for not preabmle in "%s"', text)
+    # logging.debug('Checking for not preabmle in "%s"', text)
 
     return -1
