@@ -28,7 +28,10 @@ def setArguments(isFlask):
     d.progName = d.progName[0:-3]        # Strip off the .py ending
 
     parser = argparse.ArgumentParser(description='AutoCode Clinical Documents')
-    if not isFlask:
+    if isFlask:
+        parser.add_argument('-F', '--Flask', dest='isFlask', action='store_true',
+                        help='Run the AutoCoding Clinical Documents project as a website and api service')
+    else:
         parser.add_argument('-I', '--inputDir', dest='inputDir',
                             help='The folder containing the clinical document text files (default="testData")')
         parser.add_argument('-i', '--inputFile', dest='inputFile',
@@ -458,6 +461,7 @@ def complete():
         depth = 0
         changesAt, matchLen = ch.checkHistory(inHistory, thisText, depth)
         while changesAt is not None:        # Bounced in or out of history mid sentence
+            logging.debug('checkHistory() - bounced in/out of history at %d for %d characters', changesAt, matchLen)
             if firstChange and (changesAt == 0):            # Changed at the start of the text which is the start of the sentence
                 d.sentences[-1][1] = not inHistory
             else:
@@ -808,4 +812,3 @@ def complete():
     d.sc.complete()
 
     return (d.EX_OK, 'success')
-

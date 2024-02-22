@@ -5,6 +5,7 @@ The common data for AutoCoding Clinical Documents
 # pylint: disable=invalid-name, line-too-long
 
 import re
+from flask import Flask
 
 # This next section is plagurised from /usr/include/sysexits.h
 EX_OK = 0        # successful termination
@@ -106,10 +107,8 @@ sentenceNegationLists = {}	# The lists of lower concepts in a sentence that need
 documentNegationLists = {}	# The lists of lower concepts anywhere in the document that need to be made ambiguous because of a negated instance of the higher concept
 sentenceConceptSequenceSets = []	# The list of higher concepts and their asscociated concept sequence set that are checked on a sentence by sentence basis
 sentenceConceptSets = []	# The list of higher concepts and their associated concept set that are checked on a sentence by sentence basis
-inSentenceConceptSets = {}	# The dictionary of concepts that exist in one or more of the sentence concept sets and the list of sentence concept sets this concept exits in
 documentConceptSequenceSets = []	# The list of higher concepts and their asscociated concept sequence set that are checked on a whole of document basis
 documentConceptSets = []	# The list of higher concepts and their associated concept set that are checked on a whole of document basis
-inDocumentConceptSets = {}	# The dictionary of concepts that exist in one or more of the document concept sets and the list of document concept sets this concept exits in
 sentenceConceptFound = []   # The list of sentence concepts found
 documentConceptFound = []   # The list of documents concepts found
 
@@ -122,3 +121,6 @@ grid = []                   # The list of lists of Diagnoses (Site/Finding pairs
 historyProcedure = {}       # The dictionary of historical procedures (key:position in document, value: tuple of procedure code and sentenceNo)
 hysterectomy = set()        # The set of tuples of hysterectomy procedures (tuple:(concept, sentenceNo))
 otherProcedure = set()      # The set of tuples of other (non-hysterectomy) procedures (tuple:(concept, sentenceNo))
+
+# Flask
+app = Flask(__name__)

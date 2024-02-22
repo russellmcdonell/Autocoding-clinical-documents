@@ -18,7 +18,7 @@
             "name": "Flask AutoCode Solution1",
             "type": "debugpy",
             "request": "launch",
-            "program": "flask/AutoCoding.py",
+            "program": "AutoCoding.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "cwd": "${workspaceFolder}/.",

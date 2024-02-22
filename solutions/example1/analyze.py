@@ -786,11 +786,11 @@ def analyze():
             thisReportSite = siteInfo[0]
             thisReportSet = siteInfo[1]
             conceptNo = 0           # Step through the concepts for this Report Site in thisReportSet
+            logging.debug('analyze() - checking Report Site set %d - %s', setNo, thisReportSet)
             for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
                 document = sentence[6]      # Sentences hold mini-documents
                 for start in sorted(document, key=int):        # We step through all concepts in this sentence
                     for j in range(len(document[start])):            # Step through the list of alternate concepts at this point in this sentence
-                        concept = document[start][j]['concept']
                         if document[start][j]['used']:        # Skip used concepts [only Findings get 'used']
                             continue
                         if document[start][j]['history']:            # Skip historical concepts
@@ -818,6 +818,7 @@ def analyze():
                         if conceptNo == len(thisReportSet):
                             # We have a full concept sequence set - so save this Report Site
                             foundSites.append(thisReportSite)
+                            conceptNo = 0       # Reset in case this set occurs more than once
 
         # Now check the foundSites to see if we can use any of them
         for thisSite in foundSites:
@@ -1018,7 +1019,7 @@ def analyze():
     return
 
 
-def reportJSON():
+def reportJSON(asSuccess):
     '''
     Assemble the response as a dictionary.
     reportHTML converts this into HTML.
@@ -1026,6 +1027,24 @@ def reportJSON():
     '''
 
     response = {}
+    if not asSuccess:       # Return and empty dictionary upon failure
+        response['SCTprocedure'] = ''
+        response['grid'] = []
+        response['AIHWprocedure'] = ''
+        response['S'] = {}
+        response['S']['code'] = ''
+        response['S']['desc'] = ''
+        response['E'] = {}
+        response['E']['code'] = ''
+        response['E']['desc'] = ''
+        response['O'] = {}
+        response['O']['code'] = ''
+        response['O']['desc'] = ''
+        response['otherHysterectomies'] = []
+        response['otherProcedures'] = []
+        return response
+
+    # Build the dictionary of response values
     response['SCTprocedure'] = d.sd.reportSN_CTprocedure
     response['grid'] = []
     for row in d.sd.grid:
@@ -1229,14 +1248,14 @@ def reportHTML():
     logging.info('reportHTML')
 
     message = '<h2>AutoCoding of a Histopathology Report</h2>'
-    response = reportJSON()
-    siteLen = 0
-    findLen = 0
-    aihwLen = 4
+    response = reportJSON(True)
+    siteLen = 5
+    findLen = 8
+    aihwLen = 5
     for row in response['grid']:
-        SiteLen = len(row['site']) + len(row['site description']) + 1    # Allow for a trailing space
-        FindingLen = len(row['finding']) + len(row['finding description']) + 1    # Allow for a trailing space
-        AIHWlen = len(row['AIHW'])
+        SiteLen = len(row['site']) + len(row['site description']) + 4    # Allow for a trailing space
+        FindingLen = len(row['finding']) + len(row['finding description']) + 4    # Allow for a trailing space
+        AIHWlen = len(row['AIHW']) + 1      # Allow for a trailing space
         if SiteLen > siteLen:
             siteLen = SiteLen
         if FindingLen > findLen:
@@ -1250,26 +1269,26 @@ def reportHTML():
     else:
         message += 'Procedure: WARNING - No Procedure specified\n'
 
-    message += f"+-{'-':{siteLen}}+-{'-':{findLen}}+-{'-':{aihwLen}}+\n"
+    message += f"+-{'-' * siteLen}+-{'-'* findLen}+-{'-' * aihwLen}+\n"
     message += f"| {'Site':{siteLen}}| {'Finding':{findLen}}| {'AIHW':{aihwLen}}|\n"
-    message += f"+-{'-':{siteLen}}+-{'-':{findLen}}+-{'-':{aihwLen}}+\n"
+    message += f"+-{'-' * siteLen}+-{'-'* findLen}+-{'-' * aihwLen}+\n"
 
     # Next print the Grid (it is already in descending S, then descending E, then descending O order)
     for row in response['grid']:
         message += f"| {row['site'] + ' - ' + row['site description']:{siteLen}}"
-        message += f"|  {row['finding'] + ' - ' + row['finding description']:{findLen}}"
+        message += f"| {row['finding'] + ' - ' + row['finding description']:{findLen}}"
         message += f"| {row['AIHW']:{aihwLen}}|\n"
-    message += f"+-{'-':{siteLen}}+-{'-':{findLen}}+-{'-':{aihwLen}}+\n\n"
+    message += f"+-{'-' * siteLen}+-{'-'* findLen}+-{'-' * aihwLen}+\n"
 
     # Now output the AIHW results
     message += 'AIHW\n'
     if response['AIHWprocedure']['code'] != '':
-        message += f"Procedure: { response['O']['desc']} - {response['AIHWprocedure']['desc']}\n"
+        message += f"Procedure: { response['O']['code']} - {response['AIHWprocedure']['desc']}\n"
     else:
         message += 'Procedure: WARNING - No Procedure specified\n'
     message += f"S: {response['S']['code']} - {response['S']['desc']}\n"
     message += f"E: {response['E']['code']} - {response['E']['desc']}\n"
-    message += f"O: {response['O']['desc']} - { response['O']['desc']}\n"
+    message += f"O: {response['O']['code']} - { response['O']['desc']}\n"
     message += '</pre><br>'
     if len(response['otherHysterectomies']) > 0:
         SCTcodeWidth = len('SCT code')
@@ -1286,14 +1305,14 @@ def reportHTML():
             if len(row[3]) >= AIHWdescWidth:
                 AIHWdescWidth = len(row[3]) + 1      # Allow for a trailing space
         message += '<pre>Other Hysterectomies\n'
-        message += f"+-{'-':{SCTcodeWidth}}+-{'-':{SCTdescWidth}}+-{'-':{AIHWcodeWidth}}+-{'-':{AIHWdescWidth}}+\n"
+        message += f"+-{'-' * SCTcodeWidth}+-{'-' * SCTdescWidth}+-{'-' * AIHWcodeWidth}+-{'-' * AIHWdescWidth}+\n"
         message += f"| {'SCT code':{SCTcodeWidth}}| {'SCT hysterectomy description':{SCTdescWidth}}"
         message += f"| {'AIHW code':{AIHWcodeWidth}}| {'AIHW hysterectomy description':{AIHWdescWidth}}|\n"
-        message += f"+-{'-':{SCTcodeWidth}}+-{'-':{SCTdescWidth}}+-{'-':{AIHWcodeWidth}}+-{'-':{AIHWdescWidth}}+\n"
+        message += f"+-{'-' * SCTcodeWidth}+-{'-' * SCTdescWidth}+-{'-' * AIHWcodeWidth}+-{'-' * AIHWdescWidth}+\n"
         for row in response['otherHysterectomies']:
             message += f'| {row[0]:{SCTcodeWidth}}| {row[1]:{SCTdescWidth }}'
             message += f'| {row[2]:{AIHWcodeWidth}}| {row[3]:{AIHWdescWidth}}|\n'
-        message += f"+-{'-':{SCTcodeWidth}}+-{'-':{SCTdescWidth}}+-{'-':{AIHWcodeWidth}}+-{'-':{AIHWdescWidth}}+\n"
+        message += f"+-{'-' * SCTcodeWidth}+-{'-' * SCTdescWidth}+-{'-' * AIHWcodeWidth}+-{'-' * AIHWdescWidth}+\n"
         message += '</pre><br>'
 
     if len(response['otherProcedures']) > 0:
@@ -1311,13 +1330,13 @@ def reportHTML():
             if len(row[3]) >= AIHWdescWidth:
                 AIHWdescWidth = len(row[3]) + 1      # Allow for a trailing space
         message += '<pre>Other Procedures\n'
-        message += f"+-{'-':{SCTcodeWidth}}+-{'-':{SCTdescWidth}}+-{'-':{AIHWcodeWidth}}+-{'-':{AIHWdescWidth}}+\n"
+        message += f"+-{'-' * SCTcodeWidth}+-{'-' * SCTdescWidth}+-{'-' * AIHWcodeWidth}+-{'-' * AIHWdescWidth}+\n"
         message += f"| {'SCT code':{SCTcodeWidth}}| {'SCT hysterectomy description':{SCTdescWidth}}"
         message += f"| {'AIHW code':{AIHWcodeWidth}}| {'AIHW hysterectomy description':{AIHWdescWidth}}|\n"
-        message += f"+-{'-':{SCTcodeWidth}}+-{'-':{SCTdescWidth}}+-{'-':{AIHWcodeWidth}}+-{'-':{AIHWdescWidth}}+\n"
+        message += f"+-{'-' * SCTcodeWidth}+-{'-' * SCTdescWidth}+-{'-' * AIHWcodeWidth}+-{'-' * AIHWdescWidth}+\n"
         for row in response['otherProcedures']:
             message += f'| {row[0]:{SCTcodeWidth}}| {row[1]:{SCTdescWidth }}'
             message += f'| {row[2]:{AIHWcodeWidth}}| {row[3]:{AIHWdescWidth}}|\n'
-        message += f"+-{'-':{SCTcodeWidth}}+-{'-':{SCTdescWidth}}+-{'-':{AIHWcodeWidth}}+-{'-':{AIHWdescWidth}}+\n"
+        message += f"+-{'-' * SCTcodeWidth}+-{'-' * SCTdescWidth}+-{'-' * AIHWcodeWidth}+-{'-' * AIHWdescWidth}+\n"
         message += '</pre><br>'
     return message

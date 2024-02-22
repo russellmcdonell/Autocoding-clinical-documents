@@ -82,19 +82,25 @@ def solutionCheckHistory(inHistory, text):
         return (-1, None, None)
     else:                # We are not in history - check to see if that we have fallen into a new history section
         # Checking if this sentence contains 'INFORMATION:' and any of the three previous sentences starts with 'CLINICAL'
+        logging.debug('solutionCheckHistory() - searching through sentences %s', d.sentences)
         clinicalFound = -1
         search = re.search(r'\b' + r'INFORMATION\s*:', text)
-        if search is not None:      # We have 'INFORMATION' in the current last sentence in d.sentences
+        if search is not None:      # We have 'INFORMATION' in the current sentence in d.sentences
             clinicalFound = -1      # Now search previous sentence for 'CLINICAL'
             if (len(d.sentences) == 0) and (re.search(r'^\s*CLINICAL', text) is not None):
+                logging.debug('solutionCheckHistory() - found CLINICAL in  this text(%s)', text)
                 clinicalFound = 0
             if (len(d.sentences) > 0) and (re.search(r'^\s*CLINICAL', d.sentences[-1][4]) is not None):
+                logging.debug('solutionCheckHistory() - found CLINICAL in sentence[-1](%s)', d.sentences[-1][4])
                 clinicalFound = 1
-            elif (len(d.sentences) > 1) and (re.search(r'^\s*CLINICAL', d.sentences[-2][4]) is not None):
+            if (len(d.sentences) > 1) and (re.search(r'^\s*CLINICAL', d.sentences[-2][4]) is not None):
+                logging.debug('solutionCheckHistory() - found CLINICAL in sentence[-2](%s)', d.sentences[-2][4])
                 clinicalFound = 2
-            elif (len(d.sentences) > 2) and (re.search(r'^\s*CLINICAL', d.sentences[-3][4]) is not None):
+            if (len(d.sentences) > 2) and (re.search(r'^\s*CLINICAL', d.sentences[-3][4]) is not None):
+                logging.debug('solutionCheckHistory() - found CLINICAL in sentence[-3](%s)', d.sentences[-3][4])
                 clinicalFound = 3
-            elif (len(d.sentences) > 3) and (re.search(r'^\s*CLINICAL', d.sentences[-4][4]) is not None):
+            if (len(d.sentences) > 3) and (re.search(r'^\s*CLINICAL', d.sentences[-4][4]) is not None):
+                logging.debug('solutionCheckHistory() - found CLINICAL in sentence[-4](%s)', d.sentences[-4][4])
                 clinicalFound = 4
         if clinicalFound == -1:
             return (-1, None, None)

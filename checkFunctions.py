@@ -4,12 +4,8 @@ The common functions for the Clinical Costing system.
 
 # pylint: disable=invalid-name, line-too-long, broad-exception-caught, unused-variable, superfluous-parens, too-many-lines
 
-import os
 import sys
-import argparse
 import logging
-import re
-import pandas as pd
 import functions as f
 import data as d
 
@@ -116,14 +112,14 @@ def checkHistory(inHistory, text, depth):
                     matchLen = len(match.group())
         if historyEndFound:        # We did bounced out of history
             logging.debug('checkHistory() - end of history found at %d with "%s"', newStart, text[newStart:newStart + matchLen])
-            return (newStart, matchLen)
+            return newStart, matchLen
         # We are still in history, or at least we think we are - the specific solution may have a different answer
         historyEnds, scChangeAt, scLen = d.sc.solutionCheckHistory(inHistory, text)
         # The solution can indicate that history ended at a previous sentence
         # All sentences between this new end of history and the current sentence are not history
         if historyEnds == 0:        # History ends with this sentence
             logging.debug('checkHistory() - solution say history ended at the start of this sentence')
-            return (scChangeAt, scLen)
+            return scChangeAt, scLen
         elif historyEnds > 0:        # History ended with a previous sentence
             # History ended several sentences ago - update those sentences to not history
             # We need to reprocess these sentence as they were processed as though they were in history.
@@ -144,6 +140,7 @@ def checkHistory(inHistory, text, depth):
                 lastChange = 0
                 changesAt, matchLen = checkHistory(thisHistory, txt, depth + 1)
                 while changesAt is not None:        # Bounced in or out of history mid sentence
+                    logging.debug('checkHistory() - bounced in/out of history at %d for %d characters', changesAt, matchLen)
                     if firstChange and (changesAt == 0):            # Changed at the start of the text which is the start of the sentence
                         d.sentences[-1 - fixIt][1] = not thisHistory
                     elif len(d.sentences[-1 - fixIt][5]) == 0:    # Check for previous changes
@@ -158,9 +155,9 @@ def checkHistory(inHistory, text, depth):
                     thisHistory = not thisHistory
                     txt = txt[changesAt + matchLen:]
                     changesAt, matchLen = checkHistory(thisHistory, txt, depth + 1)
-            return (0, scLen)
+            return None, None       # No changes in current sentence
         else:
-            return (None, None)
+            return None, None
     else:        # We are not in history - check that we didn't fall into another history section
         logging.debug('Checking for entering history in text(%s)', text)
         # Check for the configured start of history markers (regular expression, ignore case)
@@ -181,14 +178,14 @@ def checkHistory(inHistory, text, depth):
                     matchLen = len(match.group())
         if historyFound:        # We did bounce into history
             logging.debug('checkHistory() - history found at %d with text "%s"', newStart, text[newStart:newStart + matchLen])
-            return (newStart, matchLen)
+            return newStart, matchLen
         # We aren't in history, or at least we don't think we are - the specific solution may have a different answer
         historyAt, scChangeAt, scLen = d.sc.solutionCheckHistory(inHistory, text)
         # The solution can indicate that history started at a previous sentence
         # All sentences between this new start of history and the current sentence are history
         if historyAt == 0:            # History starts with this sentence
             logging.debug('checkHistory() - solution say history started at the start of this sentence')
-            return (scChangeAt, scLen)
+            return scChangeAt, scLen
         elif historyAt > 0:            # History starts at a previous sentence
             # History started several sentences ago - update those sentences to history
             # We need to reprocess these sentence as they were processed as though they were not in history.
@@ -197,7 +194,7 @@ def checkHistory(inHistory, text, depth):
                 logging.critical('Too many levels of recursion when checking history')
                 logging.shutdown()
                 sys.exit(d.EX_CONFIG)
-            logging.debug('checkHistory() - solution says history started %d sentences ago', historyEnds)
+            logging.debug('checkHistory() - solution says history started %d sentences ago', historyAt)
             thisHistory = True
             for fixIt in range(0, historyAt):
                 d.sentences[-1 - fixIt][0] = False        # Has no history changes
@@ -223,7 +220,7 @@ def checkHistory(inHistory, text, depth):
                     thisHistory = not thisHistory
                     txt = txt[changesAt + matchLen:]
                     changesAt, matchLen = checkHistory(thisHistory, txt, depth + 1)
-            return (0, scLen)
+            return None, None       # No changes in current sentence
         else:
             # We didn't run into history. Check if we have a pre-history sentence tag in the sentence
             startHistory = None
@@ -237,8 +234,8 @@ def checkHistory(inHistory, text, depth):
                         matchLen = len(match.group())
             if startHistory is not None:
                 logging.debug('checkHistory() - found a pre-history tag at %d', startHistory)
-                return (startHistory, matchLen)
-        return (None, None)
+                return startHistory, matchLen
+        return None, None
 
 
 def checkNegation(concept, text, start, sentenceNo, isNeg):
@@ -548,7 +545,7 @@ def checkSets(history):
                     if len(conceptList) == len(thisSet):
                         # We have a full concept (strict) (sequence) set - so save the higher concept - append the higher concept to the list of alternates
                         logging.info('Sentence concept sequence set (%s:%s) found', higherConcept, thisSet)
-                        addAdditionalConcept(higherConcept, sentenceNo, thisStart, jj, None, higherConceptNegated,
+                        f.addAdditionalConcept(higherConcept, sentenceNo, thisStart, jj, None, higherConceptNegated,
                                             f'sentenceConceptSequenceSet:{repr(thisSet)}', 0)
 
                         # Check if we should mark all/some of the concepts in the concept list as used
@@ -740,7 +737,7 @@ def checkSets(history):
                     if conceptNo == len(thisSet):
                         # We have a full set - so save the higher concept
                         logging.info('Document concept Sequence set (%s:%s) found', higherConcept, thisSet)
-                        addAdditionalConcept(higherConcept, sentenceNo, thisStart, jj, None, higherConceptNegated,
+                        f.addAdditionalConcept(higherConcept, sentenceNo, thisStart, jj, None, higherConceptNegated,
                                              f'documentConceptSequenceSet:{repr(thisSet)}', 0)
 
                         # Check if we should mark all/some of the concepts in the concept list as used

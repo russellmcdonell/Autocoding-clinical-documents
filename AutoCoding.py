@@ -1,4 +1,4 @@
-# pylint: disable=line-too-long, broad-exception-caught, too-many-lines. too-many-nested-blocks
+# pylint: disable=line-too-long, broad-exception-caught, too-many-lines, too-many-nested-blocks, wrong-import-position
 '''
 Script AutoCoding.py
 A script to find clinical concepts (MetaThesaurus codes) in text document and map them to other coding systems.
@@ -105,10 +105,14 @@ import threading
 import re
 from http import client
 from openpyxl import load_workbook
+from flask import Flask
 import functions as f
-import checkFunctions as ch
 import excelFunctions as excel
 import data as d
+
+
+app = Flask(__name__)
+import flaskFunctions as flsk
 
 
 def getDocument(fileName):
@@ -387,7 +391,7 @@ if __name__ == '__main__':
     if isFlask:
         for requiredFunction in ['reportHTML', 'reportJSON']:
             if not hasattr(d.sa, requiredFunction):
-                logging.fatal('"analyzee" module in solution "%s" is missing the "%s" function', d.solution, requiredFunction)
+                logging.fatal('"analyze" module in solution "%s" is missing the "%s" function', d.solution, requiredFunction)
                 logging.shutdown()
                 sys.exit(d.EX_CONFIG)
     else:
@@ -401,7 +405,12 @@ if __name__ == '__main__':
     d.knownConcepts.update(configConcepts)
     logging.debug('Analyze module loaded and configured')
 
-    # Now read in the file(s) and AutoCode them
+    if isFlask:         # Run as a website and api service
+        print(f'flsk:{flsk}')
+        app.run(host="0.0.0.0")
+        sys.exit(d.EX_OK)
+
+    # Not flask, so read in the file(s) and AutoCode them
     # If neither inputDir, nor inputFile is specified, then read one file from standard input
     # and print the results to standard output.
     # If only inputDir is specified and outputDir is specified then process all the files in inputDir
