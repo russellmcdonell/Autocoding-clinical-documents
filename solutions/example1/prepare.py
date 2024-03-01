@@ -99,9 +99,9 @@ def solutionCleanDocument():
             # logging.debug('empty line == end of list')
             if len(newDocument) > 0:
                 # Change a colon at the end of the previous line, if present, to a full stop
-                newDocument[-1] = d.sd.noColon.sub(r'.', newDocument[-1])
+                newDocument[-1] = d.noColon.sub(r'.', newDocument[-1])
                 # Append a full stop to the end of the previous sentence if necessary
-                newDocument[-1] = d.sd.addPeriod.sub(r'\1.', newDocument[-1], count=1)
+                newDocument[-1] = d.addPeriod.sub(r'\1.', newDocument[-1], count=1)
         else:
             for marker in d.sd.listMarkers:
                 # logging.debug('Checking list marker:%s', marker[0].pattern)
@@ -112,27 +112,28 @@ def solutionCleanDocument():
                     if d.sd.hasColon.search(match.group()) is not None:
                         parts = cleanLine.split(':')                # Replace additional ':' with '.'
                         cleanLine = parts[0] + ':'
-                        for i in range(1, len(parts) - 1):
-                            cleanLine += parts[i] + '. '
                         if len(parts) > 1:
+                            if len(parts) > 2:
+                                for i in range(1, len(parts) - 1):
+                                    cleanLine += parts[i] + '. '
                             cleanLine += parts[-1]
                     if len(newDocument) > 0:
                         # Change a colon at the end of the previous line, if present, to a full stop
-                        newDocument[-1] = d.sd.noColon.sub(r'.', newDocument[-1])
+                        newDocument[-1] = d.noColon.sub(r'.', newDocument[-1])
                         # Append a full stop to the end of the previous sentence if necessary
                         # logging.debug('Adding period to(%s)', newDocument[-1])
-                        newDocument[-1] = d.sd.addPeriod.sub(r'\1.', newDocument[-1], count=1)
+                        newDocument[-1] = d.addPeriod.sub(r'\1.', newDocument[-1], count=1)
                         # this.logger.debug('With period (%s)', newDocument[-1])
-            newDocument.append(cleanLine)
 
             # Histopathology document have 'headings' which will be cleaned up as 'Labels' by the normal cleanup code.
             # But it would be nice if the preceding sentence ended with a full stop!
             if d.sd.allCAPS.match(cleanLine) is not None:
                 if len(newDocument) > 0:
                     # Change a colon at the end of the previous line, if present, to a full stop
-                    newDocument[-1] = d.sd.noColon.sub(r'.', newDocument[-1])
+                    newDocument[-1] = d.noColon.sub(r'.', newDocument[-1])
                     # Append a full stop to the end of the previous sentence if necessary
-                    newDocument[-1] = d.sd.addPeriod.sub(r'\1.', newDocument[-1], count=1)
+                    newDocument[-1] = d.addPeriod.sub(r'\1.', newDocument[-1], count=1)
+            newDocument.append(cleanLine)
 
     d.preparedDocument = '\n'.join(newDocument) + '\n'
     # logging.debug('Text document after lists removed:')

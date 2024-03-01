@@ -216,7 +216,7 @@ def loadDictionarySetSheet(wb, workbook, sheet, columns):
     Returns
         target          - dict
     '''
-    this_df = checkWorksheet(wb, workbook, sheet, columns, True)
+    this_df = checkWorksheet(wb, workbook, sheet, columns, False)
     thisData = this_df.values.tolist()
     target = {}
     for record in thisData:

@@ -1,5 +1,5 @@
 # pylint: disable=line-too-long, broad-exception-caught, invalid-name, too-many-lines, too-many-nested-blocks
-# pylint: disable=too-many-locals, too-many-branches, too-many-statements, unused-import
+# pylint: disable=too-many-locals, too-many-branches, too-many-statements, unused-import, unnecessary-pass
 
 '''
 This is the histopathology autocoding analysis module
@@ -210,6 +210,7 @@ def configure(wb):
     # These Findings can only be paired with one of these sites
     requiredColumns = ['MetaThesaurusID', 'HistopathologySiteIDs']
     d.sd.SiteRestrictions = excel.loadDictionarySetSheet(wb, 'analyze', 'site restricted', requiredColumns)
+    # logging.debug('analyze() - SiteRestrictions (%s)', d.sd.SiteRestrictions)
     isDefined = set()
     for concept, row in d.sd.SiteRestrictions.items():
         if concept in isDefined:
@@ -425,40 +426,41 @@ def gridAppend (sentenceNo, start, thisSite, isHistory, thisFinding, AIHWcode, s
         subSiteCode     - str, the classification of Site into cervix, enometrial, etc.
     '''
 
-    if not isHistory:
-        # logging.debug('gridAppend() - saving Site(%s)/Finding(%s)', thisSite, thisFinding)
-        if AIHWcode[0] == 'S':
-            if AIHWcode[1] not in 'NU':
-                AIHWrank = 1
-            elif AIHWcode[1] == 'U':
-                AIHWrank = 2
-            else:
-                AIHWrank = 3
-        elif AIHWcode[0] == 'E':
-            if AIHWcode[1] not in 'NU':
-                AIHWrank = 4
-            elif AIHWcode[1] == 'U':
-                AIHWrank = 5
-            else:
-                AIHWrank = 6
+    if not isHistory and ((thisSite, thisFinding) not in d.sd.gridFound):
+        if thisSite in d.sd.Site:
+            logging.debug('gridAppend() - saving Site[%s](%s - %s)/Finding[%s](%s - %s)',
+                        thisSite, d.sd.Site[thisSite]['snomed_ct'], d.sd.Site[thisSite]['desc'],
+                        thisFinding, d.sd.Finding[thisFinding]['snomed_ct'], d.sd.Finding[thisFinding]['desc'])
         else:
-            if AIHWcode[1] not in 'NU':
-                AIHWrank = 7
-            elif AIHWcode[1] == 'U':
-                AIHWrank = 8
-            else:
+            logging.debug('gridAppend() - saving Site[%s]/Finding[%s](%s - %s)',
+                        thisSite, thisFinding, d.sd.Finding[thisFinding]['snomed_ct'], d.sd.Finding[thisFinding]['desc'])
+        if AIHWcode[0] == 'S':
+            try:
+                AIHWrank = ['S4.2', 'S4.1', 'S3.3', 'S3.2', 'S3.1', 'S2', 'S1', 'SU', 'SN'].index(AIHWcode)
+            except ValueError:
                 AIHWrank = 9
+        elif AIHWcode[0] == 'E':
+            try:
+                AIHWrank = ['E4.4', 'E4.3', 'E4.2', 'E4.1', 'E3.2', 'E3.1', 'E2', 'E1', 'EU', 'EN'].index(AIHWcode) + 10
+            except ValueError:
+                AIHWrank = 20
+        else:
+            try:
+                AIHWrank = ['O4.2', 'O4.1', 'O3.2', 'O3.1', 'O2', 'O1', 'ON', 'OU'].index(AIHWcode) + 21
+            except ValueError:
+                AIHWrank = 29
         for i, grid in enumerate(d.sd.grid):
             if grid[3] > AIHWrank:      # Insert before here
-                # logging.debug('gridAppend() - inserting code(%s), rank %d before %d at %d', AIHWcode, AIHWrank, grid[3], i)
+                logging.debug('gridAppend() - inserting code(%s), rank %d before %d at %d', AIHWcode, AIHWrank, grid[3], i)
                 d.sd.grid.insert(i, [thisSite, thisFinding, AIHWcode, AIHWrank])
                 break
         else:
-            # logging.debug('gridAppend() - appending code(%s), rank %d', AIHWcode, AIHWrank)
+            logging.debug('gridAppend() - appending code(%s), rank %d', AIHWcode, AIHWrank)
             d.sd.grid.append([thisSite, thisFinding, AIHWcode, AIHWrank])
+        d.sd.gridFound.add((thisSite, thisFinding))
 
         # Check if we've found a cervix or endometrial code
-        if subSiteCode == 'cervix':
+        if subSiteCode == 'Cervix':
             d.sd.solution['cervixDone'] = True
         elif subSiteCode == 'endom':
             d.sd.solution['endomDone'] = True
@@ -477,7 +479,7 @@ def gridAppend (sentenceNo, start, thisSite, isHistory, thisFinding, AIHWcode, s
         logging.info('saving defined procedure:%s - %s', thisProcedure, d.sd.Procedure[thisProcedure]['desc'])
         # We save the sentence number for reporting purposes
         # If the AIHW code for this procedure is '7', then this is a hysterectomy procedure.
-        # We only need to check the 'cervix' site because, for hysterectomies, the AIHW code is '7' for all sites.
+        # We only need to check the 'Cervix' site because, for hysterectomies, the AIHW code is '7' for all sites.
         if d.sd.Procedure[thisProcedure]['Cervix'] == '7':
             d.sd.hysterectomy.add((thisProcedure, sentenceNo))
         else:
@@ -519,19 +521,19 @@ def analyze():
                 if concept in d.sd.Procedure:
                     # Check if it's a history procedure
                     if isHistory:    # Save the last history procedure
-                        logging.info('saving history procedure:%s - %s', str(concept), str(d.sd.Procedure[concept]['desc']))
+                        logging.info('saving history procedure (sentence %d):%s - %s', sentenceNo, str(concept), str(d.sd.Procedure[concept]['desc']))
                         d.sd.historyProcedure[start] = concept
                     else:
-                        logging.info('saving procedure:%s - %s', str(concept), str(d.sd.Procedure[concept]['desc']))
+                        logging.info('saving procedure (sentence %d):%s - %s', sentenceNo, str(concept), str(d.sd.Procedure[concept]['desc']))
                         # Check if this is a hysterectomy
                         # If the AIHW code for this procedure is '7', then this is a hysterectomy procedure.
-                        # We only need to check the 'cervix' site because, for hysterectomies, the AIHW code is '7' for all sites.
+                        # We only need to check the 'Cervix' site because, for hysterectomies, the AIHW code is '7' for all sites.
                         if d.sd.Procedure[concept]['Cervix'] == '7':
                             d.sd.hysterectomy.add((concept, sentenceNo))
-                            logging.info('saving hysterectomy procedure:%s - %s', str(concept), str(d.sd.Procedure[concept]['desc']))
+                            logging.info('saving hysterectomy procedure(sentence %d):%s - %s', sentenceNo, str(concept), str(d.sd.Procedure[concept]['desc']))
                         else:
                             d.sd.otherProcedure.add((concept, sentenceNo))
-                            logging.info('saving other procedure:%s - %s', str(concept), str(d.sd.Procedure[concept]['desc']))
+                            logging.info('saving other procedure(sentence %d):%s - %s', sentenceNo, str(concept), str(d.sd.Procedure[concept]['desc']))
                     continue
 
                 # Check if this concept is a Finding
@@ -541,7 +543,7 @@ def analyze():
                     if start not in SentenceFindings[sentenceNo]:
                         SentenceFindings[sentenceNo][start] = []
                     SentenceFindings[sentenceNo][start].append((concept, isHistory))        # The Sentence Finding(s)
-                    logging.info('saving Finding:%s - %s', str(concept), str(d.sd.Finding[concept]['desc']))
+                    logging.info('saving Finding(sentence %d):%s - %s', sentenceNo, str(concept), str(d.sd.Finding[concept]['desc']))
                     # Check if this concept is an unsatifactory Finding
                     if d.sd.Finding[concept]['Cervix'] == 'SU':
                         d.sd.solution['unsatFinding'] = concept
@@ -554,12 +556,12 @@ def analyze():
                     if start not in SentenceSites[sentenceNo]:
                         SentenceSites[sentenceNo][start] = []
                     SentenceSites[sentenceNo][start].append((concept, isHistory, False))        # The Sentence Site - not used
-                    logging.info('saving Site:%s - %s', str(concept), str(d.sd.Site[concept]['desc']))
+                    logging.info('saving Site(sentence %d):%s - %s', sentenceNo, str(concept), str(d.sd.Site[concept]['desc']))
 
                     # Mark cervixFound or endomFound if appropriate
                     # By "found" we mean that these site were noted
                     subsite = d.sd.Site[concept]['SubSite']
-                    if subsite == 'cervix':
+                    if subsite == 'Cervix':
                         if not d.sd.solution['cervixFound']:
                             d.sd.solution['cervixFound'] = True
                             logging.info('cervixFound')
@@ -574,11 +576,12 @@ def analyze():
     # logging.debug('analyze() Sentence Sites [%s]', repr(SentenceSites))
     # logging.debug('analyze() Sentence Findings [%s]', repr(SentenceFindings))
 
-    # Juxtopositiona Analysis
+    # Juxtoposition Analysis
     # Start by looking through each sentence for Site/Finding pairs, in the same history phase, and add them to the grid.
     # [Only non-history things are actually added to the grid, but the gridAppend() function does procedure analysis as well
     #  for implied procedures, which can be historical.]
     d.sd.grid = []
+    d.sd.gridFound = set()
     d.sd.solution['cervixDone'] = False
     d.sd.solution['endomDone'] = False
     for sentenceNo in range(len(d.sentences)):            # Step through each sentence
@@ -602,7 +605,7 @@ def analyze():
         SiteAt = {}
         for SiteIndex, SiteStart in enumerate(sorted(SentenceSites[sentenceNo])):
             SiteAt[SiteStart] = SiteIndex
-        # logging.debug('analyze() Sites at (%s)', SiteAt)
+        logging.debug('analyze() Sites at (%s) in sentence %d', SiteAt, sentenceNo)
 
         # Work through the findings in this sentence
         for FindingStart in SentenceFindings[sentenceNo]:
@@ -615,7 +618,7 @@ def analyze():
                     nearestStart = SiteStart
             # Now work through all the Findings at this FindingStart - looking for the best Site
             for thisFindingIndex, (thisFinding, thisFindingHistory) in enumerate(SentenceFindings[sentenceNo][FindingStart]):
-                # logging.debug('analyze() - looking for nearest/best Site(near %d) for Finding(%s) at %d', nearestStart, thisFinding, FindingStart)
+                logging.debug('analyze() - looking for nearest/best Site(near %d) for Finding(%s) at %d', nearestStart, thisFinding, FindingStart)
                 # Now test every site
                 bestRank = None
                 bestSiteStart = None
@@ -661,7 +664,12 @@ def analyze():
                     findingCode = d.sd.Finding[thisFinding][siteCode]
                     gridAppend(sentenceNo, FindingStart, bestSite, bestSiteHistory, thisFinding, findingCode, subSiteCode)
                     # Delete this finding and move onto the next one
+                    # logging.debug('analyze() - deleting Finding (%s) at %d from sentence %d', thisFinding, FindingStart, sentenceNo)
+                    # logging.debug('analyze() - Findings at %d in sentence no %d - %s',
+                    #               FindingStart, sentenceNo, SentenceFindings[sentenceNo][FindingStart])
                     del SentenceFindings[sentenceNo][FindingStart][thisFindingIndex]
+                    # logging.debug('analyze() - remaining Findings at %d in sentence no %d - %s',
+                    #               FindingStart, sentenceNo, SentenceFindings[sentenceNo][FindingStart])
                     # Mark the site as used
                     SentenceSites[sentenceNo][bestSiteStart][bestSiteIndex] = (bestSite, bestSiteHistory, True)
         # Clean up any empty Sentence Findings
@@ -671,9 +679,9 @@ def analyze():
         # end of this sentence
     # end of sentences
 
-    # Now re-work the sentences looking for remaining Findings.
+    # Now re-work the sentences looking for Sites for any remaining Findings.
     # These can occur when the site is in a subheading, with all the finding in following sentence below that subheading
-    for sentenceNo in range(len(d.sentences) - 1):            # Step through each sentence - except that last one - no where to look forward from there
+    for sentenceNo, sentence in enumerate(d.sentences):            # Step through each sentence
         # Check if there is a remaining found Finding in this sentence
         if len(SentenceFindings[sentenceNo]) == 0:
             # logging.debug('No unmatched findings in sentence(%d)', sentenceNo)
@@ -682,28 +690,36 @@ def analyze():
         # Check a number of the sentences around this Finding
         maxGap = 2            # Sites are really only valid for two sentences (unless the grid is empty)
         if len(d.sd.grid) == 0:
-            maxGap = 4        # in which case they are valid for 4
+            maxGap = 3        # in which case they are valid for 3
         # Find the Sites across these sentences
+        logging.debug('analyze() - checking sentence %d with findings (%s) for Sites within %d sentences',
+                      sentenceNo, SentenceFindings[sentenceNo], maxGap)
         localSites = []
         bestSiteIndex = None
         for sno in range(max(0, sentenceNo - maxGap), min(sentenceNo + maxGap, len(d.sentences))):
+            # logging.debug('analyze() - checking sentence %d which has Sites(%s)', sno, SentenceSites[sno])
             if sno == sentenceNo:        # No Sites in the current sentence - that was handled above
                 localSites.append((sno, 0))     # A fake marker being "this sentence"
                 bestSiteIndex = len(localSites)     # The index of "this sentence"
                 continue
+            elif (sno > sentenceNo) and (d.sd.sentenceCAPS.match(d.sentences[sno][4]) is not None):    # Stop searching forward if we hit a label
+                break
             if len(SentenceSites[sno]) == 0:        # No Sites in this sentence
                 continue
             for SiteStart in sorted(SentenceSites[sno]):        # Add all the sites in this sentence
                 localSites.append((sno, SiteStart))
         # If there are no Sites around this sentence, just the fake marker for "this sentence" - go to the next sentence
         if len(localSites) == 1:
-            break
+            logging.debug('analyze() - no sites found')
+            continue        # Check the next sentence as any findings must remain unmatched
+        else:
+            # logging.debug('analyze() - Sites found (%s)', localSites)
+            pass
 
         # Walk through the findings in this sentence
         for FindingStart in SentenceFindings[sentenceNo]:
             # Then wak though all the Findings at this start - looking for the best Site
             for thisFindingIndex, (thisFinding, thisFindingHistory) in enumerate(SentenceFindings[sentenceNo][FindingStart]):
-
                 # Find the best site from the local sites - which is an orderd list
                 bestRank = None
                 bestSno = None
@@ -717,15 +733,21 @@ def analyze():
                     for thisSiteIndex, (thisSite, thisSiteHistory, thisSiteUsed) in enumerate(SentenceSites[sno][SiteStart]):
                         # If they are from different histories then they are not a match
                         if thisFindingHistory != thisSiteHistory:
+                            logging.debug('analyze() - Site(%s) and Finding(%s) have different histories', thisSite, thisFinding)
                             continue
                         # Skip if not in restricted list
                         if (thisFinding in d.sd.SiteRestrictions) and len(d.sd.SiteRestrictions[thisFinding]) > 0:
                             if thisSite not in d.sd.SiteRestrictions[thisFinding]:
+                                logging.debug('analyze() - Site(%s) not in restricted list (%s) for Finding(%s)',
+                                              thisSite, d.sd.SiteRestrictions[thisFinding], thisFinding)
                                 continue
                         # Skip if in impossible list
                         if (thisFinding in d.sd.SiteImpossible) and len(d.sd.SiteImpossible[thisFinding]) > 0:
                             if thisSite in d.sd.SiteImpossible[thisFinding]:
+                                logging.debug('analyze() - Site(%s) is impossible Site (%s) for Finding(%s)',
+                                              thisSite, d.sd.SiteImpossible[thisFinding], thisFinding)
                                 continue
+                        # logging.debug('analyze() - possible Site (%s) in sentence %d at %d', thisSite, sno, SiteStart)
                         # Compute the ranking
                         if (thisFinding in d.sd.SiteRank) and (thisSite in d.sd.SiteRank[thisFinding]):
                             rank = d.sd.SiteRank[thisFinding][thisSite]
@@ -742,6 +764,7 @@ def analyze():
                             bestSiteHistory = thisSiteHistory
                 # If we found a Site add it to the grid, mark the Site as used and delete this Finding from SentenceFindings
                 if bestRank is not None:
+                    logging.debug('analyze() - best Site (%s)', bestSite)
                     siteCode = d.sd.Site[bestSite]['Site']
                     subSiteCode = d.sd.Site[bestSite]['SubSite']
                     findingCode = d.sd.Finding[thisFinding][siteCode]
@@ -750,6 +773,9 @@ def analyze():
                     del SentenceFindings[sentenceNo][FindingStart][thisFindingIndex]
                     # Mark the site as used
                     SentenceSites[bestSno][bestSiteStart][bestSiteIndex] = (thisSite, thisSiteHistory, True)
+                else:
+                    logging.debug('analyze() - no suitable Site')
+                    pass
         # Clean up any empty Sentence Findings
         for findingStart in list(SentenceFindings[sentenceNo].keys()):
             if len(SentenceFindings[sentenceNo][findingStart]) == 0:
@@ -824,7 +850,7 @@ def analyze():
         # Now check the foundSites to see if we can use any of them
         for thisSite in foundSites:
             subsite = d.sd.Site[thisSite]['SubSite']
-            if subsite == 'cervix':         # A 'cervix' type Site
+            if subsite == 'Cervix':         # A 'Cervix' type Site
                 if d.sd.solution['cervixDone']:
                     continue
                 if d.sd.solution['unsatFinding'] is not None:
@@ -846,7 +872,7 @@ def analyze():
                     findingCode = 'ON'      # Not applicable
                 elif d.sd.solution['endomFound']:
                     Finding = d.sd.normalEndomCode
-                    findingCode = 'ON'      # Not applicable
+                    findingCode = 'O1'      # Negative/no abnormalities reported or benign changes only
                 else:
                     Finding = d.sd.noAbnormality
                     findingCode = 'E1'      # Negative
@@ -863,7 +889,7 @@ def analyze():
     # Now add any 'normal' finding for any missing things - there may have been no Report Sites
     logging.info('cervixFound:%s, cervixDone:%s', d.sd.solution['cervixFound'], d.sd.solution['cervixDone'])
     if d.sd.solution['cervixFound'] and not d.sd.solution['cervixDone']:
-        gridAppend(0, 0, d.sd.cervixUteri, False, d.sd.normalCervixCode, 'S1', 'cervix')
+        gridAppend(0, 0, d.sd.cervixUteri, False, d.sd.normalCervixCode, 'S1', 'Cervix')
     logging.info('endomFound:%s, endomDone:%d', d.sd.solution['endomFound'], d.sd.solution['endomDone'])
     if d.sd.solution['endomFound'] and not d.sd.solution['endomDone']:
         gridAppend(0, 0, d.sd.endomStructure, False, d.sd.normalEndomCode, 'O1', 'endom')
@@ -909,7 +935,7 @@ def analyze():
             histProc = d.sd.historyProcedure[histStart]
             # Check if this is a hysterectomy
             # If the AIHW code for this procedure is '7', then this is a hysterectomy procedure.
-            # We only need to check the 'cervix' site because, for hysterectomies, the AIHW code is '7' for all sites.
+            # We only need to check the 'Cervix' site because, for hysterectomies, the AIHW code is '7' for all sites.
             if d.sd.Procedure[histProc]['Cervix'] == '7':
                 d.sd.hysterectomy.add((histProc, sentenceNo))
             else:
@@ -949,15 +975,16 @@ def analyze():
         rankSno = None
         # We need to print the highest ranked procedure
         for thisProc, thisSno in d.sd.otherProcedure:
-            if TopSite == 'Vagina':
+            if TopSite == 'Cervix':
+                thisRank = int(d.sd.Procedure[thisProc]['Cervix_Rank'])
+            elif TopSite == 'Vagina':
                 thisRank = int(d.sd.Procedure[thisProc]['Vagina_Rank'])
             elif TopSite == 'Other':
                 thisRank = int(d.sd.Procedure[thisProc]['Other_Rank'])
-            elif TopSite == 'Not_Stated':
-                thisRank = int(d.sd.Procedure[thisProc]['Not_Stated_Rank'])
             else:
-                thisRank = int(d.sd.Procedure[thisProc]['Cervix_Rank'])
+                thisRank = int(d.sd.Procedure[thisProc]['Not_Stated_Rank'])
             if (thisRank > rank) and (thisRank != 99):        # Filter out invalid procedures
+                logging.debug('analyze() - selecting Other Procedure (TopSite (%s), rank %d) %s from sentence %s', TopSite, thisRank, thisProc, thisSno)
                 rank = thisRank
                 rankProc = thisProc
                 rankSno = thisSno
@@ -1003,14 +1030,6 @@ def analyze():
         if proc in reportedProcs:
             continue
         logging.info('Unused Procedure in sentence(%d):%s - %s', sno, proc, d.sd.Procedure[proc]['desc'])
-        if TopSite == 'Vagina':
-            thisRank = int(d.sd.Procedure[proc]['Vagina_Rank'])
-        elif TopSite == 'Other':
-            thisRank = int(d.sd.Procedure[proc]['Other_Rank'])
-        elif TopSite == 'Not_Stated':
-            thisRank = int(d.sd.Procedure[proc]['Not_Stated_Rank'])
-        else:
-            thisRank = d.sd.Procedure[proc]['Cervix_Rank']
         AIHWProc = d.sd.Procedure[proc][TopSite]
         if AIHWProc == '99':
             d.sd.solution['otherProcedures'].append([d.sd.Procedure[proc]['snomed_ct'], d.sd.Procedure[proc]['desc'], 'WARNING', 'No Applicable Procedure specified'])
@@ -1110,7 +1129,7 @@ def reportFile(folder, filename):
             thisSiteCodeLen = len(d.sd.Site[thisSite]['snomed_ct'])
             thisSiteDescLen = len(d.sd.Site[thisSite]['desc'])
         else:
-            thisSiteCodeLen = 0
+            thisSiteCodeLen = len('21229009')
             thisSiteDescLen = len('Topography not assigned (body structure)')
         thisFindingCodeLen = len(d.sd.Finding[thisFinding]['snomed_ct'])
         thisFindingDescLen = len(d.sd.Finding[thisFinding]['desc'])

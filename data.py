@@ -114,7 +114,7 @@ documentConceptFound = []   # The list of documents concepts found
 
 # Precompiled regular expressions for complete
 noColon = re.compile(r'([:])\s+$')
-addPeriod = re.compile(r'([^.])\s*$')
+addPeriod = re.compile(r'([^:.])\s*$')
 
 # Analysis
 grid = []                   # The list of lists of Diagnoses (Site/Finding pairs) and the associate S/E/O code [and rank]

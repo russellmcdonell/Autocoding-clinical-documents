@@ -2,7 +2,7 @@
 The common functions for the Clinical Costing system.
 '''
 
-# pylint: disable=invalid-name, line-too-long, broad-exception-caught, unused-variable, superfluous-parens, too-many-lines
+# pylint: disable=invalid-name, line-too-long, broad-exception-caught, unused-variable, superfluous-parens, too-many-lines, unnecessary-pass
 
 import os
 import sys
@@ -371,7 +371,7 @@ def AutoCode():
     except ValueError as thisE:
         logging.critical('Invalid JSON response (%s) from MetaMapLite Service - error(%s)', repr(responseData), repr(thisE))
         return (d.EX_SOFTWARE, f'Invalid JSON response ({repr(response.status)}) from MetaMapLite Service:({repr(thisE)})')
-    # logging.debug('MetaMapLite response:%s', json.dumps(d.MetaMapLiteResponse, indent=2))
+    logging.debug('MetaMapLite response:%s', json.dumps(d.MetaMapLiteResponse, indent=2))
     # The MetaMapLite response is a dictionary with two keys - "concepts" and "sentences", each of which is an array of dictionaries
     # for "concepts" each dictionary has only one key - being a MetaMapLite Concept ID. The value is a dictionary with five keys
     #        "start" - where the text mapped to this concept starts in the text document
@@ -524,7 +524,9 @@ def complete():
             if conceptID not in d.otherConcepts:
                 logging.warning('New Concept(%s) in sentence(%d), text(%s)', conceptID, sentenceNo, thisText)
             continue
-        # logging.debug('Concept[%d:%d]:%s', thisStart, sentenceNo, repr(thisConcept))
+        else:
+            logging.debug('Concept(%s) at %d in sentence(%d), text(%s):%s', conceptID, thisStart, sentenceNo, thisText, repr(thisConcept))
+            pass
 
         # Check if this is a historical concept
         isHistory = d.sentences[sentenceNo][1]
@@ -640,6 +642,13 @@ def complete():
                 document = sentence[6]    # Sentences hold mini-documents
                 if thisStart not in document:
                     document[thisStart] = []
+                else:
+                    found = False       # Check that we aren't doubling up
+                    for miniDoc in document[thisStart]:
+                        if (miniDoc['concept'] == thisConcept) and (miniDoc['negation'] == thisIsNeg):
+                            found = True
+                    if found:
+                        continue
                 miniDoc = len(document[thisStart])
                 document[thisStart].append({})
                 document[thisStart][miniDoc]['length'] = match.end() - match.start()
